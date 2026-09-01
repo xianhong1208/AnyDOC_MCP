@@ -97,3 +97,16 @@ def test_discovery_absent_when_auth_disabled():
     c = _client(auth_enabled=False)
     assert c.get("/.well-known/oauth-protected-resource").status_code == 404
     assert c.get("/.well-known/oauth-authorization-server").status_code == 404
+
+
+def test_well_known_documents_are_cors_open():
+    """Hosts that probe discovery from the browser need CORS on every well-known document."""
+    c = _client()
+    for path in ("/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp"):
+        r = c.get(path, headers={"Origin": "http://localhost"})
+        assert r.status_code == 200
+        assert r.headers.get("access-control-allow-origin") == "*", path
+    r = c.options("/.well-known/oauth-authorization-server",
+                  headers={"Origin": "http://localhost", "Access-Control-Request-Method": "GET"})
+    assert r.status_code == 204
+    assert r.headers.get("access-control-allow-origin") == "*"

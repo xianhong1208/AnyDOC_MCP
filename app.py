@@ -197,5 +197,6 @@ def create_app(config: BaseModel, transport: str):
     fastapi_app.mount("/", mcp_app)
 
     # --- Middleware stack (outermost runs first) ---
-    log_wrapped = RequestLogMiddleware(app=fastapi_app)
+    from src.api.router.oauth_discovery import WellKnownCORSMiddleware
+    log_wrapped = RequestLogMiddleware(app=WellKnownCORSMiddleware(fastapi_app))
     return RequestIdMiddleware(app=log_wrapped)
