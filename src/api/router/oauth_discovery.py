@@ -24,6 +24,45 @@ from src.log import get_api_logger
 logger = get_api_logger()
 router = APIRouter(tags=["OAuth discovery"], include_in_schema=False)
 
+_CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Max-Age": "3600",
+}
+
+
+class WellKnownCORSMiddleware:
+    """Allow browsers on any origin to read `/.well-known/*`.
+
+    Discovery documents are public by definition, and some MCP hosts probe them from the browser
+    rather than from their backend; without these headers the fetch succeeds on the server but the
+    browser discards the response. FastMCP already does this for its own path-specific document.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope["path"].startswith("/.well-known/"):
+            await self.app(scope, receive, send)
+            return
+        if scope["method"] == "OPTIONS":
+            headers = [(k.lower().encode(), v.encode()) for k, v in _CORS_HEADERS.items()]
+            await send({"type": "http.response.start", "status": 204, "headers": headers})
+            await send({"type": "http.response.body", "body": b""})
+            return
+
+        async def send_with_cors(message):
+            if message["type"] == "http.response.start":
+                existing = {k.lower() for k, _ in message.get("headers", [])}
+                extra = [(k.lower().encode(), v.encode()) for k, v in _CORS_HEADERS.items()
+                         if k.lower().encode() not in existing]
+                message = {**message, "headers": list(message.get("headers", [])) + extra}
+            await send(message)
+
+        await self.app(scope, receive, send_with_cors)
+
 _CACHE_TTL_SEC = 300
 _cache: dict[str, tuple[float, dict]] = {}
 
