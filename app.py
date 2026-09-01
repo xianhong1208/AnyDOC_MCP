@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
-from src.auth import build_auth_provider
+from src.auth import build_auth_provider, resolve_auth_settings
 from src.config.config_manager import Config
 from src.log import get_api_logger
 from src.middleware.request_id import RequestIdMiddleware
@@ -121,6 +121,7 @@ def create_app(config: BaseModel, transport: str):
     )
     fastapi_app.state.config = config
     fastapi_app.state.instructions = instructions
+    fastapi_app.state.auth_settings = resolve_auth_settings(config)
 
     # --- Load modules ---
     modules_conf = getattr(config, 'modules', None)
@@ -169,6 +170,11 @@ def create_app(config: BaseModel, transport: str):
         fastapi_app.include_router(health_router)
     except Exception as e:
         api_logger.error(f"Failed to load health router: {e}")
+
+    # --- OAuth discovery for clients that probe the root / legacy well-known paths ---
+    if fastapi_app.state.auth_settings is not None:
+        from src.api.router.oauth_discovery import router as discovery_router
+        fastapi_app.include_router(discovery_router)
 
     # --- Index (landing page at /) ---
     try:
