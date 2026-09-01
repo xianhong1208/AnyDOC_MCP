@@ -1,0 +1,50 @@
+# =============================================================================
+# AnyDoc configuration
+#
+# Values may reference environment variables:
+#   ${VAR}           required - startup fails when it is unset
+#   ${VAR:-default}  optional - falls back to the default
+# =============================================================================
+
+server:
+  host: "${SERVER_HOST:-0.0.0.0}"
+  port: ${SERVER_PORT:-5055}
+  transport: "http"
+
+# Bearer tokens are verified against MCP Center's JWKS (RS256, offline after the first fetch).
+# `base_url` is the address this server is reached at; the token audience is derived from it
+# (`<base_url>/mcp`) and must equal what MCP Center registered for this service.
+# Set AUTH_ENABLED=false only for local experiments.
+auth:
+  enabled: ${AUTH_ENABLED:-true}
+  issuer: "${MCP_CENTER_URL:-http://localhost:4568}"
+  base_url: "${ANYDOC_BASE_URL:-http://127.0.0.1:5055}"
+  # audience: override only when the registered resource URI is not <base_url>/mcp
+  required_scopes: []
+
+logging:
+  level: "${LOG_LEVEL:-INFO}"
+  format: "colorized"
+  file: "logs/app.log"
+  max_size: "10MB"
+  backup_count: 3
+
+app:
+  name: "AnyDoc"
+  version: "1.0.0"
+  title: "AnyDoc"
+  description: "Document conversion MCP server: Office, PDF, Markdown, HTML, spreadsheets, presentations and images, plus PDF split / extract / rotate / encrypt."
+
+convert:
+  max_input_mb: ${MAX_INPUT_MB:-50}         # per-file limit
+  engine_timeout_sec: ${ENGINE_TIMEOUT:-180}
+  max_hops: 3                               # longest multi-hop conversion path (mirrors registry.MAX_HOPS)
+
+modules:
+  enabled:
+    - anydoc
+
+  anydoc:
+    mcp_tools:
+      module: "src.fastmcp_tools.anydoc_tools"
+      function_name: "register_anydoc_tools"

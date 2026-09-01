@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+.pytest_cache/
+coverage.xml
+.hypothesis/
+
+# mypy / ruff
+.mypy_cache/
+.ruff_cache/
+
+# Secrets - never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Logs (generated at runtime)
+logs/
+*.log
+
+# Claude Code local config
+.claude/
+
+# Windows desktop build output
+desktop/build/
+desktop/dist/
+Output/
