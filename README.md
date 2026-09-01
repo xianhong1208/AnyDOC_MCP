@@ -29,8 +29,8 @@ sudo apt-get install -y libreoffice-writer libreoffice-calc libreoffice-impress 
 `fonts-noto-cjk` is not optional: without it LibreOffice renders CJK text in PDFs as `□□□` and reports success. Tesseract language packs are not optional either — a missing pack makes Tesseract fail to start rather than degrade.
 
 ```bash
-git clone https://github.com/xianhong1208/AnyDoc.git
-cd AnyDoc
+git clone https://github.com/xianhong1208/AnyDOC_MCP.git
+cd AnyDOC_MCP
 uv sync
 ```
 

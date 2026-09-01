@@ -29,8 +29,8 @@ sudo apt-get install -y libreoffice-writer libreoffice-calc libreoffice-impress 
 `fonts-noto-cjk` 不可省略：少了它，LibreOffice 產出的 PDF 中 CJK 文字會變成 `□□□`，而且回報成功。Tesseract 語言包同樣不可省略 —— 缺少語言包會讓 Tesseract 直接無法啟動，而不是降級處理。
 
 ```bash
-git clone https://github.com/xianhong1208/AnyDoc.git
-cd AnyDoc
+git clone https://github.com/xianhong1208/AnyDOC_MCP.git
+cd AnyDOC_MCP
 uv sync
 ```
 
