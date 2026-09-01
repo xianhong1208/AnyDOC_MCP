@@ -73,6 +73,7 @@ claude mcp add --transport http anydoc http://localhost:5055/mcp \
 
 ```bash
 curl -s http://localhost:5055/.well-known/oauth-protected-resource/mcp   # points at MCP Center
+curl -s http://localhost:5055/.well-known/oauth-authorization-server      # 轉發 MCP Center 的 metadata,給較舊的 client 用
 curl -i -X POST http://localhost:5055/mcp                                  # 401 without a token
 ```
 
