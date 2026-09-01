@@ -19,7 +19,6 @@ auth:
   enabled: ${AUTH_ENABLED:-true}
   issuer: "${MCP_CENTER_URL:-http://localhost:4568}"
   base_url: "${ANYDOC_BASE_URL:-http://127.0.0.1:5055}"
-  # audience: override only when the registered resource URI is not <base_url>/mcp
   required_scopes: []
 
 logging:
