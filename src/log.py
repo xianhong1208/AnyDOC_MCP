@@ -32,10 +32,8 @@ from loguru import logger
 # fastmcp / starlette are deliberately NOT imported at module level.
 #
 # This logger is used by every module under src/domain/, so a module-level import
-# would tie the whole conversion core to the MCP framework through the logger. The
-# desktop GUI never touches HTTP, yet it would drag fastmcp, uvicorn, starlette and
-# opentelemetry into the bundle (tens of MB), and excluding them would make the
-# program fail to start.
+# would tie the whole conversion core to the MCP framework through the logger — a
+# non-HTTP caller would still pull fastmcp, uvicorn, starlette and opentelemetry in.
 #
 # Only log_request_info() actually needs them, so it imports lazily. This also lets
 # the conversion core run standalone without any web framework.

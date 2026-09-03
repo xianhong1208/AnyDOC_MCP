@@ -46,8 +46,3 @@ logs/
 
 # Claude Code local config
 .claude/
-
-# Windows desktop build output
-desktop/build/
-desktop/dist/
-Output/
