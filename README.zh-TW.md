@@ -13,7 +13,7 @@
 - **多跳規劃，並說明代價。** 沒有引擎能直接把 A 轉成 B 時，registry 會搜尋最多三跳的路徑並依 fidelity 排序。有損的跳預設允許，但會在結果中標記，讓模型轉告使用者；傳 `allow_quality_loss=false` 則拒絕任何會失去版面的路徑。
 - **沒有檔名也能偵測格式。** 副檔名 → MIME → 容器內部檢查（ZIP 目錄 / OLE2 stream）→ 檔頭魔數。十六種格式在完全沒有檔名與 MIME type 的情況下仍能正確辨識。
 - **標準化認證。** Bearer token 依 MCP Center 的 JWKS 驗證（issuer、audience、可選的 scope）；伺服器發布 `/.well-known/oauth-protected-resource/mcp`，讓支援 OAuth 的 client 找到登入入口。
-- **到處都能跑。** 一個內建所有引擎的 Docker image，或直接 `uv run`。Windows 桌面版（Tkinter GUI，不需伺服器）在 [`desktop/`](desktop/README.md)。
+- **到處都能跑。** 一個內建所有引擎的 Docker image，或直接 `uv run`。
 
 ## 安裝
 

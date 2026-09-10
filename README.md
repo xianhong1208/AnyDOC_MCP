@@ -13,7 +13,7 @@ Authentication is delegated to [MCP Center](https://github.com/xianhong1208/MCP_
 - **Multi-hop planning that says what it costs.** When no engine converts A → B directly, the registry searches up to three hops, ranked by fidelity. Lossy hops are allowed by default but flagged in the result so the model can tell the user; pass `allow_quality_loss=false` to refuse any path that would lose layout.
 - **Format detection without a file name.** Extension → MIME → container inspection (ZIP directory / OLE2 streams) → magic bytes. Sixteen formats are recognised with no name and no MIME type at all.
 - **Standards-based auth.** Bearer tokens are verified against MCP Center's JWKS (issuer, audience, optional scopes); the server publishes `/.well-known/oauth-protected-resource/mcp` so OAuth-aware clients discover where to sign in.
-- **Runs anywhere.** One Docker image with all engines baked in, or a plain `uv run`. A Windows desktop build (Tkinter GUI, no server) lives in [`desktop/`](desktop/README.md).
+- **Runs anywhere.** One Docker image with all engines baked in, or a plain `uv run`.
 
 ## Install
 
