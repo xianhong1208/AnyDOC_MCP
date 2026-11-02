@@ -1,12 +1,12 @@
 [project]
 name = "anydoc"
 version = "1.0.0"
-description = "AnyDoc - document conversion MCP server (Office, PDF, Markdown, images, OCR) protected by MCP Center OAuth 2.1"
+description = "AnyDoc - document conversion MCP server (Office, PDF, Markdown, images, OCR) protected by MCP Gate OAuth 2.1"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.13"
 dependencies = [
-    "fastmcp>=3.2.0",
+    "fastmcp>=4.1.5",
     "mcp[cli]>=1.24.0",
     "fastapi>=0.104.0",
     "uvicorn>=0.30.0",
