@@ -11,13 +11,13 @@ server:
   port: ${SERVER_PORT:-5055}
   transport: "http"
 
-# Bearer tokens are verified against MCP Center's JWKS (RS256, offline after the first fetch).
+# Bearer tokens are verified against MCP Gate's JWKS (RS256, offline after the first fetch).
 # `base_url` is the address this server is reached at; the token audience is derived from it
-# (`<base_url>/mcp`) and must equal what MCP Center registered for this service.
+# (`<base_url>/mcp`) and must equal what MCP Gate registered for this service.
 # Set AUTH_ENABLED=false only for local experiments.
 auth:
   enabled: ${AUTH_ENABLED:-true}
-  issuer: "${MCP_CENTER_URL:-http://localhost:4568}"
+  issuer: "${MCP_GATE_URL:-http://localhost:4568}"
   base_url: "${ANYDOC_BASE_URL:-http://127.0.0.1:5055}"
   required_scopes: []
 
