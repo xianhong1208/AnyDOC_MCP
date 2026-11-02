@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 
 from fastmcp.server.auth import RemoteAuthProvider
 from fastmcp.server.auth.providers.jwt import JWTVerifier
-from pydantic import AnyHttpUrl
 
 from src.log import get_api_logger
 
@@ -61,7 +60,9 @@ def build_auth_provider(config) -> RemoteAuthProvider | None:
             audience=settings.audience,
             required_scopes=settings.required_scopes,
         ),
-        authorization_servers=[AnyHttpUrl(settings.issuer)],
+        # A plain string is published as-is; AnyHttpUrl would add a trailing slash that mcp 2 clients
+        # reject as an issuer mismatch (RFC 8414 3.3 compares issuers as exact strings).
+        authorization_servers=[settings.issuer],
         base_url=settings.base_url,
     )
     logger.info(f"Authentication enabled: issuer={settings.issuer} audience={settings.audience}")
