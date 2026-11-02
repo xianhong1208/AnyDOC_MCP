@@ -33,8 +33,8 @@ def test_root_protected_resource_matches_path_specific_one():
     root = c.get("/.well-known/oauth-protected-resource").json()
     specific = c.get("/.well-known/oauth-protected-resource/mcp").json()
     assert root["resource"] == specific["resource"] == "http://anydoc.test:5050/mcp"
-    assert [u.rstrip("/") for u in root["authorization_servers"]] == \
-        [u.rstrip("/") for u in specific["authorization_servers"]] == ["http://center.test:4568"]
+    # Exact string: mcp 2 clients reject "http://center.test:4568/" as an issuer mismatch (RFC 8414 3.3)
+    assert root["authorization_servers"] == specific["authorization_servers"] == ["http://center.test:4568"]
 
 
 def test_authorization_server_metadata_is_proxied_and_cached(monkeypatch):
