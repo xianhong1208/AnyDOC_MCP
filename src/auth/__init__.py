@@ -1,6 +1,6 @@
-"""Resource-server side of OAuth 2.1: verify MCP Center access tokens.
+"""Resource-server side of OAuth 2.1: verify MCP Gate access tokens.
 
-AnyDoc never issues tokens. It trusts one authorization server (MCP Center), fetches its
+AnyDoc never issues tokens. It trusts one authorization server (MCP Gate), fetches its
 JWKS once, and verifies every bearer token offline. FastMCP's `RemoteAuthProvider` also
 publishes `/.well-known/oauth-protected-resource/mcp`, which is how OAuth-capable MCP clients
 discover where to sign in.
@@ -36,7 +36,7 @@ def resolve_auth_settings(config) -> AuthSettings | None:
     if auth is None or not auth.enabled:
         return None
     if not auth.issuer:
-        raise RuntimeError("auth.issuer is required when auth.enabled is true (set MCP_CENTER_URL)")
+        raise RuntimeError("auth.issuer is required when auth.enabled is true (set MCP_GATE_URL)")
     server = config.server
     base_url = (auth.base_url or f"http://{server.host}:{server.port}").rstrip("/")
     return AuthSettings(

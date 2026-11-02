@@ -41,6 +41,18 @@ class TestExpandEnvVars:
         with pytest.raises(ValueError):
             _expand_env_vars("${REQUIRED_VAR}")
 
+    def test_renamed_var_falls_back_to_old_name(self, monkeypatch):
+        """MCP_GATE_URL unset -> the pre-rename MCP_CENTER_URL is still honoured."""
+        monkeypatch.delenv("MCP_GATE_URL", raising=False)
+        monkeypatch.setenv("MCP_CENTER_URL", "http://old:4568")
+        assert _expand_env_vars("${MCP_GATE_URL:-http://localhost:4568}") == "http://old:4568"
+
+    def test_renamed_var_wins_over_old_name(self, monkeypatch):
+        """When both are set, the new name wins."""
+        monkeypatch.setenv("MCP_GATE_URL", "http://new:4568")
+        monkeypatch.setenv("MCP_CENTER_URL", "http://old:4568")
+        assert _expand_env_vars("${MCP_GATE_URL:-http://localhost:4568}") == "http://new:4568"
+
 
 class TestConvertConfigIsWired:
     """The convert section of config.yaml must actually take effect.

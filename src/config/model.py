@@ -16,11 +16,11 @@ class ServerConfig(BaseModel):
 
 
 class AuthConfig(BaseModel):
-    """Bearer-token verification against an OAuth 2.1 authorization server (MCP Center).
+    """Bearer-token verification against an OAuth 2.1 authorization server (MCP Gate).
 
     Tokens are RS256 JWTs verified offline through the issuer's JWKS; no per-request
     network call is needed once the keys are cached. `audience` must match the resource
-    URI registered for this server in MCP Center (by default its MCP URL).
+    URI registered for this server in MCP Gate (by default its MCP URL).
     """
     enabled: bool = True
     issuer: str | None = None
