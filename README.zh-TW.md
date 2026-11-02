@@ -2,7 +2,7 @@
 
 **文件格式轉換 MCP 服務。** 上傳一個檔案，拿回你需要的格式：Office ↔ PDF、Markdown ↔ Word、試算表、簡報、圖片、掃描頁面的 OCR，以及 PDF 的分割／抽頁／旋轉／加密 —— 全部以 MCP 工具提供，任何支援 MCP 的 client（Claude Code、Claude Desktop、Cursor、FastMCP client）都能呼叫。
 
-認證委託給 [MCP Center](https://github.com/xianhong1208/MCP_Center)：AnyDoc 是一個 OAuth 2.1 resource server，透過 MCP Center 的 JWKS 離線驗證其 RS256 token。它本身不儲存使用者，也不簽發 token。
+認證委託給 [MCP Gate](https://github.com/xianhong1208/MCP_Gate)：AnyDoc 是一個 OAuth 2.1 resource server，透過 MCP Gate 的 JWKS 離線驗證其 RS256 token。它本身不儲存使用者，也不簽發 token。
 
 [English](README.md) · [快速開始](#快速開始) · [工具](#工具) · [運作方式](#運作方式) · [設定](#設定) · [架構](docs/architecture.md)
 
@@ -12,7 +12,7 @@
 - **六個引擎，依 fidelity 挑選。** LibreOffice 負責版面保真的 Office ↔ PDF，Pandoc 負責保留結構的文字格式，[firecrawl-anydoc](https://pypi.org/project/firecrawl-anydoc/) 負責快速的文件 → Markdown 抽取，Tesseract 負責 OCR，Pillow 負責圖片，另有一個輕量文字引擎處理 JSON / XML / TSV。缺少的引擎會在啟動時停用對應路徑，而不是在請求時才失敗。
 - **多跳規劃，並說明代價。** 沒有引擎能直接把 A 轉成 B 時，registry 會搜尋最多三跳的路徑並依 fidelity 排序。有損的跳預設允許，但會在結果中標記，讓模型轉告使用者；傳 `allow_quality_loss=false` 則拒絕任何會失去版面的路徑。
 - **沒有檔名也能偵測格式。** 副檔名 → MIME → 容器內部檢查（ZIP 目錄 / OLE2 stream）→ 檔頭魔數。十六種格式在完全沒有檔名與 MIME type 的情況下仍能正確辨識。
-- **標準化認證。** Bearer token 依 MCP Center 的 JWKS 驗證（issuer、audience、可選的 scope）；伺服器發布 `/.well-known/oauth-protected-resource/mcp`，讓支援 OAuth 的 client 找到登入入口。
+- **標準化認證。** Bearer token 依 MCP Gate 的 JWKS 驗證（issuer、audience、可選的 scope）；伺服器發布 `/.well-known/oauth-protected-resource/mcp`，讓支援 OAuth 的 client 找到登入入口。
 - **到處都能跑。** 一個內建所有引擎的 Docker image，或直接 `uv run`。
 
 ## 安裝
@@ -38,14 +38,14 @@ uv sync
 
 ```bash
 docker build -t anydoc .
-docker run -p 5055:5055 -e MCP_CENTER_URL=http://mcp-center:4568 anydoc
+docker run -p 5055:5055 -e MCP_GATE_URL=http://mcp-gate:4568 anydoc
 ```
 
 ## 快速開始
 
-### 1. 啟動 MCP Center 並註冊 AnyDoc
+### 1. 啟動 MCP Gate 並註冊 AnyDoc
 
-執行 [MCP Center](https://github.com/xianhong1208/MCP_Center)（預設 `http://localhost:4568`），註冊一個指向本伺服器的服務：host `127.0.0.1`、port `5055`、path `/mcp`。MCP Center 會從這筆註冊推導 token 的 audience（`http://127.0.0.1:5055/mcp`）；AnyDoc 則從 `ANYDOC_BASE_URL` 推導出同一個值，所以兩邊只要 host 與 port 一致即可。
+執行 [MCP Gate](https://github.com/xianhong1208/MCP_Gate)（預設 `http://localhost:4568`），註冊一個指向本伺服器的服務：host `127.0.0.1`、port `5055`、path `/mcp`。MCP Gate 會從這筆註冊推導 token 的 audience（`http://127.0.0.1:5055/mcp`）；AnyDoc 則從 `ANYDOC_BASE_URL` 推導出同一個值，所以兩邊只要 host 與 port 一致即可。
 
 ### 2. 啟動 AnyDoc
 
@@ -58,13 +58,13 @@ uv run python main.py
 
 ### 3. 連接 client
 
-從 MCP Center 的服務頁面複製現成的設定片段，或手動設定：
+從 MCP Gate 的服務頁面複製現成的設定片段，或手動設定：
 
 ```bash
-# Claude Code (OAuth: completes sign-in through MCP Center on first use)
+# Claude Code (OAuth: completes sign-in through MCP Gate on first use)
 claude mcp add --transport http anydoc http://localhost:5055/mcp
 
-# Any client with a personal access token issued by MCP Center
+# Any client with a personal access token issued by MCP Gate
 claude mcp add --transport http anydoc http://localhost:5055/mcp \
   --header "Authorization: Bearer <token>"
 ```
@@ -72,12 +72,12 @@ claude mcp add --transport http anydoc http://localhost:5055/mcp \
 ### 4. 驗證
 
 ```bash
-curl -s http://localhost:5055/.well-known/oauth-protected-resource/mcp   # points at MCP Center
-curl -s http://localhost:5055/.well-known/oauth-authorization-server      # 轉發 MCP Center 的 metadata,給較舊的 client 用
+curl -s http://localhost:5055/.well-known/oauth-protected-resource/mcp   # points at MCP Gate
+curl -s http://localhost:5055/.well-known/oauth-authorization-server      # 轉發 MCP Gate 的 metadata,給較舊的 client 用
 curl -i -X POST http://localhost:5055/mcp                                  # 401 without a token
 ```
 
-若要在沒有 MCP Center 的情況下本機實驗，改用 `config/config.test.yaml`（關閉認證）並執行協定 smoke test：
+若要在沒有 MCP Gate 的情況下本機實驗，改用 `config/config.test.yaml`（關閉認證）並執行協定 smoke test：
 
 ```bash
 SERVER_PORT=5056 uv run python main.py --config config/config.test.yaml
@@ -114,7 +114,7 @@ uv run python scripts/mcp_smoke.py
 ```
 client ──(bearer token)──▶ /mcp ──▶ tools ──▶ service.py ──▶ registry.plan_conversion() ──▶ engines
                              │
-                             └── JWTVerifier(jwks_uri = MCP_CENTER_URL/.well-known/jwks.json)
+                             └── JWTVerifier(jwks_uri = MCP_GATE_URL/.well-known/jwks.json)
 ```
 
 1. **輸入。** 工具接收 `file_content`（base64）、`file_name` 與 `mime_type`。管理上傳檔案的 host 通常會自動注入 base64；參數描述的措辭刻意引導模型只把上傳參照放進 `file_content`，不放在其他地方。
@@ -127,7 +127,7 @@ client ──(bearer token)──▶ /mcp ──▶ tools ──▶ service.py �
 |---|---|
 | **Fidelity** | `high`（保留版面）、`structural`（保留標題／清單／表格）、`lossy`（只有文字）。驅動路徑規劃。 |
 | **Hop** | 多步驟路徑中的一次引擎呼叫。 |
-| **Audience** | token 中的 resource URI；必須與 MCP Center 為本伺服器註冊的值相同。 |
+| **Audience** | token 中的 resource URI；必須與 MCP Gate 為本伺服器註冊的值相同。 |
 
 引擎表、規劃器的規則與格式偵測的細節在 [docs/architecture.md](docs/architecture.md)。
 
@@ -138,8 +138,8 @@ client ──(bearer token)──▶ /mcp ──▶ tools ──▶ service.py �
 | 變數 | 預設值 | 說明 |
 |---|---|---|
 | `SERVER_HOST` / `SERVER_PORT` | `0.0.0.0` / `5055` | 綁定位址。 |
-| `MCP_CENTER_URL` | `http://localhost:4568` | 簽發 token 的 MCP Center（`auth.issuer`）。 |
-| `ANYDOC_BASE_URL` | `http://127.0.0.1:5055` | 本伺服器對外的位址。token 的 audience 為 `<ANYDOC_BASE_URL>/mcp`，必須等於在 MCP Center 註冊的服務；也會出現在 protected-resource metadata 中。 |
+| `MCP_GATE_URL` | `http://localhost:4568` | 簽發 token 的 MCP Gate（`auth.issuer`）。未設定時仍會讀取改名前的 `MCP_CENTER_URL`。 |
+| `ANYDOC_BASE_URL` | `http://127.0.0.1:5055` | 本伺服器對外的位址。token 的 audience 為 `<ANYDOC_BASE_URL>/mcp`，必須等於在 MCP Gate 註冊的服務；也會出現在 protected-resource metadata 中。 |
 | `AUTH_ENABLED` | `true` | 只有本機實驗時才設為 `false`。 |
 | `MAX_INPUT_MB` | `50` | 單檔上限；同時提高 MCP 傳輸層的 body 上限（×1.5）。 |
 | `ENGINE_TIMEOUT` | `180` | 每次引擎呼叫的秒數上限。 |

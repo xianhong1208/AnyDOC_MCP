@@ -31,6 +31,11 @@ ALLOWED_CONFIG_DIRS: list[str] = [
 # Env-var placeholders: ${VAR} or ${VAR:-default}
 _ENV_VAR_PATTERN = re.compile(r"\$\{([^}:]+)(?::-([^}]*))?\}")
 
+# Renamed env vars -> the old name still read when the new one is unset
+_ENV_ALIASES: dict[str, str] = {
+    "MCP_GATE_URL": "MCP_CENTER_URL",  # MCP Center was renamed MCP Gate
+}
+
 
 def _expand_env_vars(value: Any) -> Any:
     """Recursively expand env-var placeholders in config values.
@@ -51,6 +56,8 @@ def _expand_env_vars(value: Any) -> Any:
         def _replace(match: "re.Match[str]") -> str:
             var_name, default = match.group(1), match.group(2)
             env_value = os.environ.get(var_name)
+            if env_value is None and var_name in _ENV_ALIASES:
+                env_value = os.environ.get(_ENV_ALIASES[var_name])
             if env_value is not None:
                 return env_value
             if default is not None:

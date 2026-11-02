@@ -175,7 +175,7 @@ Plans computed with `allow_quality_loss=false` (`prefer_fidelity=True`):
 
 ## Authentication
 
-AnyDoc is an OAuth 2.1 resource server. It issues no tokens and stores no users. `src/auth/` configures FastMCP's `JWTVerifier` with `jwks_uri = <MCP_CENTER_URL>/.well-known/jwks.json`, the expected issuer and audience, and optional `required_scopes`; RS256 bearer tokens issued by [MCP Center](https://github.com/xianhong1208/MCP_Center) are verified offline against that JWKS. The server publishes `/.well-known/oauth-protected-resource/mcp` so OAuth-aware MCP clients can discover the authorisation server.
+AnyDoc is an OAuth 2.1 resource server. It issues no tokens and stores no users. `src/auth/` configures FastMCP's `JWTVerifier` with `jwks_uri = <MCP_GATE_URL>/.well-known/jwks.json`, the expected issuer and audience, and optional `required_scopes`; RS256 bearer tokens issued by [MCP Gate](https://github.com/xianhong1208/MCP_Gate) are verified offline against that JWKS. The server publishes `/.well-known/oauth-protected-resource/mcp` so OAuth-aware MCP clients can discover the authorisation server.
 
 ## Testing
 

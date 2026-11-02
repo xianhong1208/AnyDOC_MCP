@@ -8,7 +8,7 @@ clients (and the 2025-03-26 revision of the MCP authorization spec) instead prob
 - `/.well-known/openid-configuration`
 
 Without these they report "cannot discover OAuth metadata". The first is served here directly; the
-other two are fetched from the authorization server (MCP Center), cached briefly and re-served, so
+other two are fetched from the authorization server (MCP Gate), cached briefly and re-served, so
 the client sees the real issuer, endpoints and JWKS URI.
 """
 
@@ -85,7 +85,7 @@ def protected_resource_metadata(settings: AuthSettings) -> dict:
 
 
 async def fetch_issuer_document(settings: AuthSettings, well_known: str) -> dict:
-    """Fetch `<issuer>/.well-known/<name>` from MCP Center with a short cache."""
+    """Fetch `<issuer>/.well-known/<name>` from MCP Gate with a short cache."""
     url = f"{settings.issuer}/.well-known/{well_known}"
     cached = _cache.get(url)
     if cached and cached[0] > time.monotonic():
