@@ -156,12 +156,15 @@ async def main():
         for b in r.content:
             print("  " + describe(b))
 
-        # -- Scenario 4: the user asks for something unsupported --
-        print("\n=== Scenario 4: 'turn this PDF back into Word' -> should refuse "
-              "and guide the AI ===")
+        # -- Scenario 4: the user insists the layout must survive --
+        # Lossy paths are allowed by default, so the refusal needs
+        # allow_quality_loss=false.
+        print("\n=== Scenario 4: 'turn this PDF back into Word, keep the layout' -> "
+              "should refuse and guide the AI ===")
         try:
             await client.call_tool("convert_document", {
                 "target_format": "docx", "output_name": "report",
+                "allow_quality_loss": False,
                 "file_content": base64.b64encode(pdf_bytes).decode(),
                 "file_name": "converted.pdf", "mime_type": "application/pdf",
             })
