@@ -1,7 +1,7 @@
 """MCP protocol-level smoke test: receive file -> convert -> return file.
 
-    # Start the server in another terminal (config.test.yaml disables auth)
-    SERVER_PORT=5056 uv run python main.py --config config/config.test.yaml
+    # Start the server in another terminal, without authentication
+    AUTH_ENABLED=false SERVER_PORT=5056 uv run python main.py
     # then
     uv run python scripts/mcp_smoke.py
 

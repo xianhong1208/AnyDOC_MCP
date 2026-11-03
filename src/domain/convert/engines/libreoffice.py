@@ -106,10 +106,8 @@ class LibreOfficeEngine(CliEngine):
             _profile_counter += 1
             n = _profile_counter
         path = Path(tempfile.gettempdir()) / f"lo_profile_{os.getpid()}_{n}"
-        # Must be a valid file:// URL. String concatenation happens to be right
-        # on Linux (/tmp/x -> file:///tmp/x), but on Windows C:\Users\x would
-        # become file://C:\Users\x: one slash short, backslashes unconverted,
-        # and LibreOffice rejects it.
+        # -env:UserInstallation needs a valid file:// URL on Windows too; see
+        # path_to_file_url for why string concatenation does not do it.
         return path_to_file_url(path)
 
     async def convert(self, data: bytes, src: str, dst: str, **opts) -> bytes:

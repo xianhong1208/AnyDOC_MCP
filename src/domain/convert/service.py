@@ -35,7 +35,8 @@ logger = get_mcptools_logger()
 MAX_INPUT_MB = 50
 
 # Output formats that can carry images. When converting to one of these, the
-# source PDF's embedded images are carried across.
+# source's embedded images (PDF XObjects, Office / EPUB assets) are carried
+# across.
 # Plain-text formats (txt / csv / tsv / json / xml) are deliberately excluded:
 # they cannot express images, and stuffing base64 into them only produces junk.
 IMAGE_CARRYING_FORMATS = {

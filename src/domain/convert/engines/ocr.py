@@ -1,16 +1,14 @@
 """Tesseract OCR engine: text recognition for images and scanned PDFs
 
-Why it is needed: MarkItDown handles images through LLM image description, not
-OCR, and without an llm_client configured it only returns EXIF metadata. The
-same goes for scanned PDFs: the pages are images, and pdfminer finds no text
-layer at all. Both inputs are extremely common in business settings (scanned
+Why it is needed: anydoc, the text-extraction engine, does not read images at
+all, and it rejects scanned PDFs because their pages are images with no text
+layer. Both inputs are extremely common in business settings (scanned
 contracts, photographed forms); without OCR the whole path is a dead end.
 
 The tesseract CLI is called directly rather than through pytesseract: CliEngine
 already handles subprocesses, timeouts and temp directories, and an extra
 Python wrapper is just one more dependency.
 """
-
 
 from src.domain.convert.engines.base import CliEngine, Workspace
 from src.domain.convert.engines.discovery import find_binary

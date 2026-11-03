@@ -33,8 +33,10 @@ def _load_instructions(path: Path = _INSTRUCTIONS_PATH) -> str:
 def _apply_convert_config(config: BaseModel) -> None:
     """Push `config.convert` into the modules that own the corresponding constants.
 
-    These used to be three hard-coded constants, which made the `convert:` section of
-    config.yaml silently ineffective - the hardest kind of configuration bug to notice.
+    max_input_mb and max_hops used to be hard-coded only, which made the `convert:`
+    section of config.yaml silently ineffective - the hardest kind of configuration bug
+    to notice. engine_timeout_sec is logged but not applied yet: each engine still uses
+    its own default timeout.
     """
     convert = getattr(config, "convert", None)
     if convert is None:
