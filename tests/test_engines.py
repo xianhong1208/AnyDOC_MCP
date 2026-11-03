@@ -162,7 +162,7 @@ class TestPdfImagePreservation:
             raise RuntimeError("corrupt image object")
 
         monkeypatch.setattr(pdfops, "extract_images", boom)
-        assert asyncio.run(anydoc_engine._images_as_markdown(b"%PDF-fake")) == ""
+        assert asyncio.run(anydoc_engine._pdf_images_markdown(b"%PDF-fake")) == ""
 
     def test_images_are_embedded_as_data_uris(self, monkeypatch):
         """Output must be data: URIs, never file path references."""
@@ -175,7 +175,7 @@ class TestPdfImagePreservation:
             return [(3, "Im1.png", b"\x89PNG" + b"x" * 3000)]
 
         monkeypatch.setattr(pdfops, "extract_images", fake)
-        md = asyncio.run(anydoc_engine._images_as_markdown(b"%PDF-fake"))
+        md = asyncio.run(anydoc_engine._pdf_images_markdown(b"%PDF-fake"))
         assert "data:image/png;base64," in md
         label = md.split("![]")[0]
         assert "3" in label, "the image must be labeled with its page number"
@@ -231,7 +231,7 @@ class TestPdfImagePreservation:
             called["fmt"] = fmt
             return [(1, "image/png", b"\x89PNG" + b"z" * 4000)]
 
-        monkeypatch.setattr(anydoc_engine, "_asset_images", fake_assets)
+        monkeypatch.setattr(anydoc_engine, "_extract_asset_images", fake_assets)
         md = asyncio.run(
             anydoc_engine.AnydocEngine()._asset_images_markdown(b"fake", "pptx")
         )
@@ -247,7 +247,7 @@ class TestPdfImagePreservation:
         def boom(data, fmt):
             raise RuntimeError("model unavailable")
 
-        monkeypatch.setattr(anydoc_engine, "_asset_images", boom)
+        monkeypatch.setattr(anydoc_engine, "_extract_asset_images", boom)
         assert asyncio.run(
             anydoc_engine.AnydocEngine()._asset_images_markdown(b"fake", "docx")
         ) == ""

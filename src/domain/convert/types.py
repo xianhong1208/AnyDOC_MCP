@@ -308,7 +308,7 @@ def _sniff_zip(data: bytes) -> str | None:
     return None
 
 
-def _ole_directory(data: bytes) -> bytes:
+def _read_ole_directory(data: bytes) -> bytes:
     """Locate the directory sectors from the OLE2 header and return them
 
     Scanning the start of the file is not enough: an OLE2 directory can live
@@ -349,7 +349,7 @@ def _sniff_ole(data: bytes) -> str | None:
     `WORKBOOK` / `Book`). anydoc's detect.rs uses `eq_ignore_ascii_case` for
     this and explicitly notes "producers vary"; this mirrors that approach.
     """
-    regions = [_ole_directory(data)]
+    regions = [_read_ole_directory(data)]
     if not regions[0]:
         # Fallback when the header is untrustworthy: scan a slice at each end.
         # In practice the directory is either near the start or at the very end.

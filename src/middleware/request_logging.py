@@ -57,22 +57,23 @@ class RequestLogMiddleware:
             logger, kind = get_api_logger(), "API"
             logger.info(f"[{kind}_REQ] {label}")
 
-        cap = {"status": None, "ct": "", "buf": bytearray()}
+        captured = {"status": None, "content_type": "", "body": bytearray()}
 
         async def send_wrapper(message):
             mtype = message["type"]
             if mtype == "http.response.start":
-                cap["status"] = message["status"]
+                captured["status"] = message["status"]
                 for k, v in message.get("headers", []):
                     if k.lower() == b"content-type":
-                        cap["ct"] = v.decode("latin-1")
+                        captured["content_type"] = v.decode("latin-1")
                         break
             elif mtype == "http.response.body":
-                ct = cap["ct"]
-                if (ct.startswith("application/json") or ct.startswith("text/event-stream")) \
-                        and len(cap["buf"]) < self.MAX_BODY_LOG:
+                content_type = captured["content_type"]
+                if (content_type.startswith("application/json")
+                        or content_type.startswith("text/event-stream")) \
+                        and len(captured["body"]) < self.MAX_BODY_LOG:
                     chunk = message.get("body", b"")
-                    cap["buf"].extend(chunk[: self.MAX_BODY_LOG - len(cap["buf"])])
+                    captured["body"].extend(chunk[: self.MAX_BODY_LOG - len(captured["body"])])
             # Forward every message immediately as-is and only tap a copy for logging,
             # so SSE streams are never stalled
             await send(message)
@@ -82,10 +83,10 @@ class RequestLogMiddleware:
         ms = round((time.perf_counter() - start) * 1000)
 
         (logger.debug if quiet else logger.info)(
-            f"[{kind}_RESP] {label} -> {cap['status']} ({ms}ms)"
+            f"[{kind}_RESP] {label} -> {captured['status']} ({ms}ms)"
         )
-        if cap["buf"]:
-            text = bytes(cap["buf"]).decode("utf-8", "replace").strip().replace("\n", " ")
+        if captured["body"]:
+            text = bytes(captured["body"]).decode("utf-8", "replace").strip().replace("\n", " ")
             logger.debug(f"[{kind}_RESP_BODY] {label} {text}")
 
     def _should_skip(self, path: str) -> bool:

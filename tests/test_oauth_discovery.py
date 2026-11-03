@@ -12,7 +12,7 @@ def _client(auth_enabled: bool = True) -> TestClient:
 
     cfg = ConfigModel(
         server=ServerConfig(host="127.0.0.1", port=5050, transport="http"),
-        auth=AuthConfig(enabled=auth_enabled, issuer="http://center.test:4568",
+        auth=AuthConfig(enabled=auth_enabled, issuer="http://gate.test:4568",
                         base_url="http://anydoc.test:5050"),
         logging=LoggingConfig(level="WARNING"),
         app=AppConfig(name="T", version="1", title="T", description=""),
@@ -33,8 +33,8 @@ def test_root_protected_resource_matches_path_specific_one():
     root = c.get("/.well-known/oauth-protected-resource").json()
     specific = c.get("/.well-known/oauth-protected-resource/mcp").json()
     assert root["resource"] == specific["resource"] == "http://anydoc.test:5050/mcp"
-    # Exact string: mcp 2 clients reject "http://center.test:4568/" as an issuer mismatch (RFC 8414 3.3)
-    assert root["authorization_servers"] == specific["authorization_servers"] == ["http://center.test:4568"]
+    # Exact string: mcp 2 clients reject "http://gate.test:4568/" as an issuer mismatch (RFC 8414 3.3)
+    assert root["authorization_servers"] == specific["authorization_servers"] == ["http://gate.test:4568"]
 
 
 def test_authorization_server_metadata_is_proxied_and_cached(monkeypatch):
@@ -44,7 +44,7 @@ def test_authorization_server_metadata_is_proxied_and_cached(monkeypatch):
         calls.append(well_known)
         return {"issuer": settings.issuer, "token_endpoint": f"{settings.issuer}/oauth/token"}
 
-    doc = {"issuer": "http://center.test:4568", "token_endpoint": "http://center.test:4568/oauth/token"}
+    doc = {"issuer": "http://gate.test:4568", "token_endpoint": "http://gate.test:4568/oauth/token"}
 
     class _Resp:
         def raise_for_status(self):
@@ -65,7 +65,7 @@ def test_authorization_server_metadata_is_proxied_and_cached(monkeypatch):
             return False
 
         async def get(self, url):
-            assert url == "http://center.test:4568/.well-known/oauth-authorization-server"
+            assert url == "http://gate.test:4568/.well-known/oauth-authorization-server"
             return _Resp()
 
     monkeypatch.setattr(oauth_discovery.httpx, "AsyncClient", _Client)

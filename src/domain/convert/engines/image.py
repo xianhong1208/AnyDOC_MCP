@@ -10,7 +10,7 @@ from src.log import get_mcptools_logger
 logger = get_mcptools_logger()
 
 # Internal code -> Pillow format name
-_PIL_FORMAT = {
+_PIL_FORMAT_NAME = {
     "png": "PNG",
     "jpg": "JPEG",
     "webp": "WEBP",
@@ -21,7 +21,7 @@ _PIL_FORMAT = {
 
 # Formats without an alpha channel: transparent areas must be flattened onto a
 # white background first, otherwise Pillow raises
-_NO_ALPHA = {"jpg", "bmp"}
+_FORMATS_WITHOUT_ALPHA = {"jpg", "bmp"}
 
 
 class ImageEngine(ConversionEngine):
@@ -37,7 +37,7 @@ class ImageEngine(ConversionEngine):
             return False
 
     async def convert(self, data: bytes, src: str, dst: str, **opts) -> bytes:
-        pil_format = _PIL_FORMAT.get(dst)
+        pil_format = _PIL_FORMAT_NAME.get(dst)
         if not pil_format:
             raise ConversionFailedError(
                 self.name, src, dst, f"Pillow cannot write '{dst}'"
@@ -50,7 +50,7 @@ class ImageEngine(ConversionEngine):
             from PIL import Image
 
             with Image.open(io.BytesIO(data)) as img:
-                if dst in _NO_ALPHA and img.mode in ("RGBA", "LA", "P"):
+                if dst in _FORMATS_WITHOUT_ALPHA and img.mode in ("RGBA", "LA", "P"):
                     # A transparent background turns into black noise in JPEG;
                     # always fill with white
                     background = Image.new("RGB", img.size, (255, 255, 255))

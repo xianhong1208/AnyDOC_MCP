@@ -69,8 +69,8 @@ def main():
 
         logger.info(f"Starting server: http://{host}:{port}")
         logger.info(f"Swagger UI: http://{host}:{port}/docs")
-        mcp_ep = "mcp" if transport == "http" else transport
-        logger.info(f"MCP endpoint: http://{host}:{port}/{mcp_ep}")
+        mcp_path = "mcp" if transport == "http" else transport
+        logger.info(f"MCP endpoint: http://{host}:{port}/{mcp_path}")
 
         app_instance = create_app(config_obj, transport=transport)
         uvicorn.run(app_instance, host=host, port=port, log_level=log_level.lower())

@@ -47,7 +47,7 @@ _WINDOWS_HINTS: dict[str, list[str]] = {
 # those, so different LibreOffice versions on the same machine do not interfere.
 _BUNDLED_SUBDIRS = ("engines", "vendor", "bin")
 
-_cache: dict[str, str | None] = {}
+_binary_path_cache: dict[str, str | None] = {}
 
 
 def _bundle_root() -> Path | None:
@@ -73,15 +73,15 @@ def find_binary(name: str) -> str | None:
     Results are cached: this function is called many times per capability
     matrix query, and each which() scans the whole PATH.
     """
-    if name in _cache:
-        return _cache[name]
+    if name in _binary_path_cache:
+        return _binary_path_cache[name]
 
-    resolved = _search(name)
-    _cache[name] = resolved
+    resolved = _locate_binary(name)
+    _binary_path_cache[name] = resolved
     return resolved
 
 
-def _search(name: str) -> str | None:
+def _locate_binary(name: str) -> str | None:
     exe_name = f"{name}.exe" if IS_WINDOWS else name
 
     root = _bundle_root()

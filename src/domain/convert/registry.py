@@ -212,7 +212,7 @@ def direct_route(src: str, dst: str) -> Route | None:
     return None
 
 
-def _adjacency() -> dict[str, dict[str, Route]]:
+def _usable_route_graph() -> dict[str, dict[str, Route]]:
     """Turn the route table into an adjacency map containing only edges usable here"""
     graph: dict[str, dict[str, Route]] = {}
     for route in DIRECT_ROUTES.values():
@@ -229,7 +229,7 @@ def _search_paths(src: str, dst: str, max_hops: int) -> list[list[Route]]:
     the worst fidelity along the path), so Dijkstra's optimal-substructure
     assumption would not hold here anyway.
     """
-    graph = _adjacency()
+    graph = _usable_route_graph()
     found: list[list[Route]] = []
 
     def walk(node: str, path: list[Route], visited: set):

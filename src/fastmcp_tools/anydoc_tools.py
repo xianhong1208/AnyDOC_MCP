@@ -35,8 +35,7 @@ from src.domain.convert.registry import (
     format_path,
 )
 from src.domain.convert.service import convert_artifact, resolve_artifact_input
-from src.domain.convert.types import FALLBACK_NAME as _FALLBACK_NAME
-from src.domain.convert.types import mime_type_for
+from src.domain.convert.types import FALLBACK_NAME, mime_type_for
 from src.log import get_mcptools_logger
 
 logger = get_mcptools_logger()
@@ -122,7 +121,7 @@ def _log_delivered(name: str, fmt: str, size: int, source_name: str | None) -> N
     somewhere.
     """
     delivered = f"{name}.{fmt}"
-    if name == _FALLBACK_NAME:
+    if name == FALLBACK_NAME:
         logger.warning(
             f"[DELIVER] {delivered} ({size / 1024:.1f} KB) -- "
             f"fallback file name used. The original name did not arrive "

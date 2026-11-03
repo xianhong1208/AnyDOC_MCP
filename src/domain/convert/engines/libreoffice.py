@@ -100,7 +100,7 @@ class LibreOfficeEngine(CliEngine):
         }
         return all(self.has_component(c) for c in needed if c)
 
-    async def _next_profile_dir(self) -> str:
+    async def _next_profile_url(self) -> str:
         global _profile_counter
         async with _profile_lock:
             _profile_counter += 1
@@ -120,7 +120,7 @@ class LibreOfficeEngine(CliEngine):
             )
 
         timeout = int(opts.get("timeout", 180))
-        profile_url = await self._next_profile_dir()
+        profile_url = await self._next_profile_url()
 
         with Workspace() as ws:
             ws.write(f"input.{src}", data)
@@ -135,7 +135,7 @@ class LibreOfficeEngine(CliEngine):
                 "--outdir", str(ws.path),
                 f"input.{src}",
             ]
-            await self._run(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout)
+            await self._run_command(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout)
 
             # soffice does not accept a custom output name; pick it up by extension
             try:

@@ -78,12 +78,12 @@ class OcrEngine(CliEngine):
             ws.write(f"input.{fmt}", data)
             # tesseract's output argument has no extension; it appends .txt itself
             argv = [self.resolved_binary(), f"input.{fmt}", "output", "-l", langs]
-            await self._run(argv, cwd=ws.path, src=fmt, dst="md", timeout=timeout)
+            await self._run_command(argv, cwd=ws.path, src=fmt, dst="md", timeout=timeout)
             return ws.read("output.txt").decode("utf-8", errors="replace")
 
     async def _ocr_pdf(self, data: bytes, langs: str, timeout: int) -> str:
-        poppler = find_binary("pdftoppm")
-        if not poppler:
+        pdftoppm = find_binary("pdftoppm")
+        if not pdftoppm:
             raise ConversionFailedError(
                 self.name, "pdf", "md",
                 "PDF OCR requires poppler-utils (pdftoppm), which is not installed "
@@ -95,8 +95,8 @@ class OcrEngine(CliEngine):
 
             # Rasterize first. -r sets the DPI, -png the format, and the trailing
             # 'page' is the file name prefix: output is page-01.png / page-02.png ...
-            await self._run(
-                [poppler, "-png", "-r", str(RASTER_DPI),
+            await self._run_command(
+                [pdftoppm, "-png", "-r", str(RASTER_DPI),
                  "-l", str(MAX_OCR_PAGES), "input.pdf", "page"],
                 cwd=ws.path, src="pdf", dst="md", timeout=timeout,
             )
@@ -114,7 +114,7 @@ class OcrEngine(CliEngine):
             # multi-threaded, so sequential processing is faster overall.
             chunks = []
             for idx, page in enumerate(pages, start=1):
-                await self._run(
+                await self._run_command(
                     [self.resolved_binary(), page.name, f"ocr-{idx}", "-l", langs],
                     cwd=ws.path, src="pdf", dst="md", timeout=timeout,
                 )

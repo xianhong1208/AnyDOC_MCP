@@ -73,7 +73,7 @@ class CliEngine(ConversionEngine):
         PATH, so the probed absolute path must be used."""
         return find_binary(self.binary) or self.binary
 
-    async def _run(
+    async def _run_command(
         self,
         argv: Sequence[str],
         cwd: Path,
@@ -118,11 +118,11 @@ class CliEngine(ConversionEngine):
             )
 
 
-class _Workspace:
+class Workspace:
     """Self-cleaning temporary working directory
 
     Usage:
-        with _Workspace() as ws:
+        with Workspace() as ws:
             src = ws.write("input.docx", data)
             ...
             return ws.read("output.pdf")
@@ -131,7 +131,7 @@ class _Workspace:
     def __init__(self):
         self._dir: Path | None = None
 
-    def __enter__(self) -> "_Workspace":
+    def __enter__(self) -> "Workspace":
         self._dir = Path(tempfile.mkdtemp(prefix="anydoc_"))
         return self
 
@@ -141,7 +141,7 @@ class _Workspace:
 
     @property
     def path(self) -> Path:
-        assert self._dir is not None, "_Workspace used outside its context manager"
+        assert self._dir is not None, "Workspace used outside its context manager"
         return self._dir
 
     def write(self, filename: str, data: bytes) -> Path:
@@ -163,5 +163,3 @@ class _Workspace:
             raise FileNotFoundError(f"No output matching '{pattern}' in workspace")
         return matches[0]
 
-
-Workspace = _Workspace

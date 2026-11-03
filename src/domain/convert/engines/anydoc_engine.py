@@ -35,14 +35,14 @@ SUPPORTED_SOURCES = {
 }
 
 
-_IMAGE_MIME = {
+_IMAGE_MIME_BY_EXT = {
     "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
     "gif": "image/gif", "bmp": "image/bmp", "tiff": "image/tiff",
     "webp": "image/webp",
 }
 
 
-def _asset_images(data: bytes, fmt) -> list:
+def _extract_asset_images(data: bytes, fmt) -> list:
     """Pull embedded images from anydoc's document model
 
     Returns [(index, media_type, bytes), ...].
@@ -69,11 +69,11 @@ def _asset_images(data: bytes, fmt) -> list:
     ]
 
 
-def _render_images(items: list, heading: str, label: str) -> str:
+def _render_image_section(items: list, heading: str, note: str) -> str:
     """Render a list of (caption, mime, bytes) as a Markdown image section"""
     if not items:
         return ""
-    parts = [f"\n\n---\n\n## {heading}\n", f"_{label}_\n"]
+    parts = [f"\n\n---\n\n## {heading}\n", f"_{note}_\n"]
     for caption, mime, blob in items:
         encoded = base64.b64encode(blob).decode("ascii")
         # Leave the alt text empty: pandoc turns it into a caption below the
@@ -84,7 +84,7 @@ def _render_images(items: list, heading: str, label: str) -> str:
     return "".join(parts)
 
 
-async def _images_as_markdown(pdf_bytes: bytes) -> str:
+async def _pdf_images_markdown(pdf_bytes: bytes) -> str:
     """Turn the PDF's embedded images into a Markdown section appended after the text
 
     Why data: URIs rather than files on disk: each hop of the conversion
@@ -114,10 +114,10 @@ async def _images_as_markdown(pdf_bytes: bytes) -> str:
     items = []
     for page_no, name, blob in images:
         ext = name.rsplit(".", 1)[-1].lower() if "." in name else "png"
-        items.append((f"Page {page_no}", _IMAGE_MIME.get(ext, "image/png"), blob))
+        items.append((f"Page {page_no}", _IMAGE_MIME_BY_EXT.get(ext, "image/png"), blob))
 
     logger.info(f"[anydoc] embedded {len(images)} image(s) as data URIs")
-    return _render_images(
+    return _render_image_section(
         items, "Images from the original document",
         "The images below were extracted from the PDF and are listed by page; "
         "their original placement cannot be restored.",
@@ -191,7 +191,7 @@ class AnydocEngine(ConversionEngine):
         if opts.get("embed_images"):
             if src == "pdf":
                 # PDF has no document model; images come from XObjects via pypdf
-                text += await _images_as_markdown(data)
+                text += await _pdf_images_markdown(data)
             else:
                 text += await self._asset_images_markdown(data, fmt)
 
@@ -208,7 +208,7 @@ class AnydocEngine(ConversionEngine):
         converted to an editable document.
         """
         try:
-            items = await asyncio.to_thread(_asset_images, data, fmt)
+            items = await asyncio.to_thread(_extract_asset_images, data, fmt)
         except Exception as e:
             # This path is a bonus; its failure must not take the already
             # extracted text down with it
@@ -218,7 +218,7 @@ class AnydocEngine(ConversionEngine):
         if not items:
             return ""
         logger.info(f"[anydoc] embedded {len(items)} asset image(s)")
-        return _render_images(
+        return _render_image_section(
             [(f"Image {index}", mime, blob) for index, mime, blob in items],
             "Images from the original document",
             "The images below were extracted from the original document in order of "

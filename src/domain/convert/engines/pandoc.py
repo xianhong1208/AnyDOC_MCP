@@ -93,7 +93,7 @@ class PandocEngine(CliEngine):
                 argv.append("--toc")
             argv += ["-o", f"output.{dst}", f"input.{src}"]
 
-            await self._run(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout)
+            await self._run_command(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout)
             result = ws.read(f"output.{dst}")
 
         logger.info(f"[pandoc] {src} → {dst}: {len(data)} → {len(result)} bytes")

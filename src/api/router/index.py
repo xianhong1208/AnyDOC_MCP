@@ -11,7 +11,7 @@ router = APIRouter(tags=["Index"])
 
 
 # Lightweight Markdown -> HTML converter
-def _inline(text: str) -> str:
+def _render_inline_markdown(text: str) -> str:
     """Apply inline Markdown syntax (code, bold, links).
 
     Args:
@@ -45,7 +45,7 @@ def markdown_to_html(md: str) -> str:
         if para:
             text = " ".join(para).strip()
             if text:
-                out.append(f"<p>{_inline(text)}</p>")
+                out.append(f"<p>{_render_inline_markdown(text)}</p>")
             para.clear()
 
     def close_list():
@@ -92,7 +92,7 @@ def markdown_to_html(md: str) -> str:
             flush_para()
             close_list()
             level = len(m.group(1))
-            out.append(f"<h{level}>{_inline(html.escape(m.group(2)))}</h{level}>")
+            out.append(f"<h{level}>{_render_inline_markdown(html.escape(m.group(2)))}</h{level}>")
             i += 1
             continue
 
@@ -104,7 +104,7 @@ def markdown_to_html(md: str) -> str:
                 close_list()
                 out.append("<ul>")
                 list_type = "ul"
-            out.append(f"<li>{_inline(html.escape(m.group(1)))}</li>")
+            out.append(f"<li>{_render_inline_markdown(html.escape(m.group(1)))}</li>")
             i += 1
             continue
 
@@ -116,7 +116,7 @@ def markdown_to_html(md: str) -> str:
                 close_list()
                 out.append("<ol>")
                 list_type = "ol"
-            out.append(f"<li>{_inline(html.escape(m.group(1)))}</li>")
+            out.append(f"<li>{_render_inline_markdown(html.escape(m.group(1)))}</li>")
             i += 1
             continue
 
@@ -130,7 +130,7 @@ def markdown_to_html(md: str) -> str:
 
 
 # Page template
-_PAGE = """<!DOCTYPE html>
+_PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -215,7 +215,7 @@ async def index(request: Request) -> HTMLResponse:
     topbar = '  <div class="topbar"><span class="wordmark">AnyDoc</span></div>'
 
     page = (
-        _PAGE
+        _PAGE_TEMPLATE
         .replace("%%TOPBAR%%", topbar)
         .replace("%%TITLE%%", html.escape(title))
         .replace("%%VERSION%%", html.escape(str(version)))
