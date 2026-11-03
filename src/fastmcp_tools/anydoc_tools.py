@@ -31,9 +31,30 @@ from src.domain.convert import pdfops
 from src.domain.convert.registry import available_engines, capability_matrix
 from src.domain.convert.service import convert_artifact, resolve_artifact_input
 from src.domain.convert.types import FALLBACK_NAME as _FALLBACK_NAME
+from src.domain.convert.types import mime_type_for
 from src.log import get_mcptools_logger
 
 logger = get_mcptools_logger()
+
+
+class _ConvertedFile(File):
+    """A File labelled with the registered MIME type of its format.
+
+    fastmcp's File derives the MIME type as "application/<format>" for every
+    non-text format, so a Word document went out as "application/docx" and a PNG
+    as "application/png". Overriding the public to_resource_content() (rather
+    than File's private MIME attribute) keeps the URI and payload encoding
+    exactly as File builds them.
+    """
+
+    def __init__(self, data: bytes, fmt: str, name: str):
+        super().__init__(data=data, format=fmt, name=name)
+        self._output_mime_type = mime_type_for(fmt)
+
+    def to_resource_content(self, mime_type=None, annotations=None):
+        return super().to_resource_content(
+            mime_type=mime_type or self._output_mime_type, annotations=annotations,
+        )
 
 # Shared parameter descriptions for the upload triple, so each tool does not
 # repeat them.
@@ -280,7 +301,7 @@ def register_anydoc_tools(mcp: FastMCP):
             await ctx.info(f"Done: {len(output.data)} bytes")
 
         _log_delivered(output.name, output.fmt, len(output.data), file_name)
-        return [summary, File(data=output.data, format=output.fmt, name=output.name)]
+        return [summary, _ConvertedFile(output.data, output.fmt, output.name)]
 
     @mcp.tool()
     async def extract_text(

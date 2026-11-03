@@ -111,6 +111,41 @@ _MIME_MAP = {
     "image/tiff": "tiff",
 }
 
+# Normalized code -> the MIME type a produced file is labelled with. Every format
+# in ALL_FORMATS needs an entry: without one, fastmcp's File falls back to
+# "application/<format>" ("application/docx", "application/png"), which no client
+# recognizes. Kept separate from _MIME_MAP, which also accepts alternative
+# spellings on input (text/rtf, text/xml) and deliberately omits some types.
+FORMAT_MIME_TYPES = {
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "doc": "application/msword",
+    "odt": "application/vnd.oasis.opendocument.text",
+    "rtf": "application/rtf",
+    "epub": "application/epub+zip",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "xls": "application/vnd.ms-excel",
+    "ods": "application/vnd.oasis.opendocument.spreadsheet",
+    "csv": "text/csv",
+    "tsv": "text/tab-separated-values",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "ppt": "application/vnd.ms-powerpoint",
+    "odp": "application/vnd.oasis.opendocument.presentation",
+    "md": "text/markdown",
+    "html": "text/html",
+    "txt": "text/plain",
+    "rst": "text/x-rst",
+    "tex": "application/x-tex",
+    "json": "application/json",
+    "xml": "application/xml",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "webp": "image/webp",
+    "gif": "image/gif",
+    "bmp": "image/bmp",
+    "tiff": "image/tiff",
+}
+
 # Magic bytes -> normalized code. Formats that can be settled from the first few
 # bytes alone go here. ZIP (PK) and OLE2 are "containers": identical headers,
 # completely different contents. Those are handed to _sniff_zip / _sniff_ole
@@ -384,6 +419,11 @@ def detect_format(
             return "pdf"
 
     return None
+
+
+def mime_type_for(fmt: str) -> str:
+    """MIME type to label an output file of normalized format `fmt` with"""
+    return FORMAT_MIME_TYPES.get(fmt, "application/octet-stream")
 
 
 def stem_of(file_name: str | None, default: str = FALLBACK_NAME) -> str:
