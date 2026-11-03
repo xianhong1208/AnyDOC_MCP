@@ -10,6 +10,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from src.domain.convert.engines import base
 from src.domain.convert.engines.base import CliEngine, Workspace
 from src.domain.convert.engines.discovery import (
     IS_WINDOWS,
@@ -117,7 +118,7 @@ class LibreOfficeEngine(CliEngine):
                 self.name, src, dst, f"LibreOffice has no filter for '{dst}'"
             )
 
-        timeout = int(opts.get("timeout", 180))
+        timeout = base.resolve_timeout(opts, 180)
         profile_url = await self._next_profile_url()
 
         with Workspace() as ws:

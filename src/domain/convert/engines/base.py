@@ -25,6 +25,20 @@ logger = get_mcptools_logger()
 
 DEFAULT_TIMEOUT_SEC = 120
 
+# convert.engine_timeout_sec (ENGINE_TIMEOUT), set at startup by app._apply_convert_config.
+# None keeps each engine's own default.
+ENGINE_TIMEOUT_SEC: int | None = None
+
+
+def resolve_timeout(opts: dict, engine_default: int) -> int:
+    """Seconds for one engine call: a per-call opts["timeout"], else the configured
+    ENGINE_TIMEOUT, else the engine's own default."""
+    if opts.get("timeout") is not None:
+        return int(opts["timeout"])
+    if ENGINE_TIMEOUT_SEC is not None:
+        return ENGINE_TIMEOUT_SEC
+    return engine_default
+
 
 class ConversionEngine(ABC):
     """Conversion engine interface

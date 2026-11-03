@@ -142,7 +142,7 @@ Everything is in [`config/config.yaml`](config/config.yaml) and reads environmen
 | `ANYDOC_BASE_URL` | `http://127.0.0.1:5055` | The address this server is reached at. The token audience is `<ANYDOC_BASE_URL>/mcp` and must equal the service registered in MCP Gate; it also appears in the protected-resource metadata. |
 | `AUTH_ENABLED` | `true` | Set to `false` only for local experiments. |
 | `MAX_INPUT_MB` | `50` | Per-file limit; also raises the MCP transport body limit (×1.5). |
-| `ENGINE_TIMEOUT` | `180` | Seconds per engine invocation. |
+| `ENGINE_TIMEOUT` | engine default | Seconds per engine call, applied to every engine. Unset keeps each engine's own limit: LibreOffice 180, Pandoc 120, OCR 300. |
 | `LOG_LEVEL` | `INFO` | |
 
 In the YAML, `auth.required_scopes` lets you demand a scope such as `mcp:tools:invoke` on every token, and `auth.audience` overrides the derived audience for the rare case where the registered resource URI is not `<base_url>/mcp`.

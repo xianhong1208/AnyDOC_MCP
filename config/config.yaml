@@ -36,8 +36,8 @@ app:
 
 convert:
   max_input_mb: ${MAX_INPUT_MB:-50}         # per-file limit
-  engine_timeout_sec: ${ENGINE_TIMEOUT:-180}
-  max_hops: 3                               # longest multi-hop conversion path (mirrors registry.MAX_HOPS)
+  engine_timeout_sec: ${ENGINE_TIMEOUT:-}    # seconds per engine call; empty = each engine's default (LibreOffice 180, Pandoc 120, OCR 300)
+  max_hops: 3                               # longest multi-hop conversion path (overrides registry.MAX_HOPS)
 
 modules:
   enabled:

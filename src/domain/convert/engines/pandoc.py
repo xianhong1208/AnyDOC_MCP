@@ -10,6 +10,7 @@ top). The same request works as md -> docx -> pdf in two hops using the
 already-installed LibreOffice, saving 2GB in the image.
 """
 
+from src.domain.convert.engines import base
 from src.domain.convert.engines.base import CliEngine, Workspace
 from src.domain.convert.types import ConversionFailedError
 from src.log import get_mcptools_logger
@@ -76,7 +77,7 @@ class PandocEngine(CliEngine):
                 self.name, src, dst, f"pandoc cannot map {src} → {dst}"
             )
 
-        timeout = int(opts.get("timeout", 120))
+        timeout = base.resolve_timeout(opts, 120)
         standalone = opts.get("standalone", True)
 
         with Workspace() as ws:

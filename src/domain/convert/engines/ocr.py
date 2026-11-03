@@ -10,6 +10,7 @@ already handles subprocesses, timeouts and temp directories, and an extra
 Python wrapper is just one more dependency.
 """
 
+from src.domain.convert.engines import base
 from src.domain.convert.engines.base import CliEngine, Workspace
 from src.domain.convert.engines.discovery import find_binary
 from src.domain.convert.types import IMAGE_FORMATS, ConversionFailedError
@@ -51,7 +52,7 @@ class OcrEngine(CliEngine):
             raise ConversionFailedError(self.name, src, dst, "OCR only produces text")
 
         langs = opts.get("ocr_lang", DEFAULT_LANGS)
-        timeout = int(opts.get("timeout", 300))
+        timeout = base.resolve_timeout(opts, 300)
 
         if src == "pdf":
             text = await self._ocr_pdf(data, langs, timeout)
