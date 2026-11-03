@@ -28,12 +28,37 @@ from fastmcp.utilities.types import File
 from pydantic import Field
 
 from src.domain.convert import pdfops
-from src.domain.convert.registry import available_engines, capability_matrix
+from src.domain.convert.registry import (
+    FIDELITY_LOSSY,
+    available_engines,
+    capability_matrix,
+    format_path,
+)
 from src.domain.convert.service import convert_artifact, resolve_artifact_input
-from src.domain.convert.types import FALLBACK_NAME as _FALLBACK_NAME
+from src.domain.convert.types import FALLBACK_NAME, mime_type_for
 from src.log import get_mcptools_logger
 
 logger = get_mcptools_logger()
+
+
+class _ConvertedFile(File):
+    """A File labelled with the registered MIME type of its format.
+
+    fastmcp's File derives the MIME type as "application/<format>" for every
+    non-text format, so a Word document went out as "application/docx" and a PNG
+    as "application/png". Overriding the public to_resource_content() (rather
+    than File's private MIME attribute) keeps the URI and payload encoding
+    exactly as File builds them.
+    """
+
+    def __init__(self, data: bytes, fmt: str, name: str):
+        super().__init__(data=data, format=fmt, name=name)
+        self._output_mime_type = mime_type_for(fmt)
+
+    def to_resource_content(self, mime_type=None, annotations=None):
+        return super().to_resource_content(
+            mime_type=mime_type or self._output_mime_type, annotations=annotations,
+        )
 
 # Shared parameter descriptions for the upload triple, so each tool does not
 # repeat them.
@@ -96,7 +121,7 @@ def _log_delivered(name: str, fmt: str, size: int, source_name: str | None) -> N
     somewhere.
     """
     delivered = f"{name}.{fmt}"
-    if name == _FALLBACK_NAME:
+    if name == FALLBACK_NAME:
         logger.warning(
             f"[DELIVER] {delivered} ({size / 1024:.1f} KB) -- "
             f"fallback file name used. The original name did not arrive "
@@ -117,7 +142,7 @@ def _fidelity_warning(plan) -> str:
     """
     if not plan:
         return ""
-    lossy = [r for r in plan if r.fidelity == "lossy"]
+    lossy = [r for r in plan if r.fidelity == FIDELITY_LOSSY]
     if lossy:
         # The wording must be precise about what survived and what did not.
         # The old text said "images have been lost", which stopped being true
@@ -265,9 +290,7 @@ def register_anydoc_tools(mcp: FastMCP):
             output_name=output_name,
         )
 
-        path_desc = (
-            " → ".join([plan[0].src] + [r.dst for r in plan]) if plan else "no conversion needed"
-        )
+        path_desc = format_path(plan) if plan else "no conversion needed"
         engines_used = ", ".join(r.engine for r in plan) if plan else "-"
         summary = (
             f"Conversion complete: {output.name}.{output.fmt}\n"
@@ -280,7 +303,7 @@ def register_anydoc_tools(mcp: FastMCP):
             await ctx.info(f"Done: {len(output.data)} bytes")
 
         _log_delivered(output.name, output.fmt, len(output.data), file_name)
-        return [summary, File(data=output.data, format=output.fmt, name=output.name)]
+        return [summary, _ConvertedFile(output.data, output.fmt, output.name)]
 
     @mcp.tool()
     async def extract_text(

@@ -10,6 +10,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from src.domain.convert.engines import base
 from src.domain.convert.engines.base import CliEngine, Workspace
 from src.domain.convert.engines.discovery import (
     IS_WINDOWS,
@@ -100,16 +101,14 @@ class LibreOfficeEngine(CliEngine):
         }
         return all(self.has_component(c) for c in needed if c)
 
-    async def _next_profile_dir(self) -> str:
+    async def _next_profile_url(self) -> str:
         global _profile_counter
         async with _profile_lock:
             _profile_counter += 1
             n = _profile_counter
         path = Path(tempfile.gettempdir()) / f"lo_profile_{os.getpid()}_{n}"
-        # Must be a valid file:// URL. String concatenation happens to be right
-        # on Linux (/tmp/x -> file:///tmp/x), but on Windows C:\Users\x would
-        # become file://C:\Users\x: one slash short, backslashes unconverted,
-        # and LibreOffice rejects it.
+        # -env:UserInstallation needs a valid file:// URL on Windows too; see
+        # path_to_file_url for why string concatenation does not do it.
         return path_to_file_url(path)
 
     async def convert(self, data: bytes, src: str, dst: str, **opts) -> bytes:
@@ -119,8 +118,8 @@ class LibreOfficeEngine(CliEngine):
                 self.name, src, dst, f"LibreOffice has no filter for '{dst}'"
             )
 
-        timeout = int(opts.get("timeout", 180))
-        profile_url = await self._next_profile_dir()
+        timeout = base.resolve_timeout(opts, 180)
+        profile_url = await self._next_profile_url()
 
         with Workspace() as ws:
             ws.write(f"input.{src}", data)
@@ -135,12 +134,11 @@ class LibreOfficeEngine(CliEngine):
                 "--outdir", str(ws.path),
                 f"input.{src}",
             ]
-            await self._run(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout)
+            await self._run_command(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout)
 
             # soffice does not accept a custom output name; pick it up by extension
-            ext = dst if dst != "txt" else "txt"
             try:
-                produced = ws.find_one(f"input.{ext}")
+                produced = ws.find_one(f"input.{dst}")
             except FileNotFoundError:
                 raise ConversionFailedError(
                     self.name, src, dst,

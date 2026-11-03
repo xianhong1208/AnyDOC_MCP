@@ -12,15 +12,7 @@ from typing import Any
 
 import yaml
 
-from .model import (
-    AppConfig,
-    AuthConfig,
-    ConfigModel,
-    LoggingConfig,
-    ModuleConfig,
-    ModulesConfig,
-    ServerConfig,
-)
+from .model import ConfigModel, LoggingConfig, ModuleConfig, ServerConfig
 
 # Allowed config file directories (allowlist)
 ALLOWED_CONFIG_DIRS: list[str] = [
@@ -213,12 +205,6 @@ class Config:
             cls._config = {}
     
     @classmethod
-    def get_config(cls) -> dict[str, Any]:
-        """Return the full config dict."""
-        return cls._config
-
-
-    @classmethod
     def get_config_model(cls) -> ConfigModel | None:
         """Return the parsed Pydantic ConfigModel, if any."""
         return cls._config_model
@@ -231,28 +217,10 @@ class Config:
         return cls._config_model.server
 
     @classmethod
-    def get_auth_config(cls) -> AuthConfig | None:
-        if cls._config_model is None:
-            return None
-        return cls._config_model.auth
-
-    @classmethod
     def get_logging_config(cls) -> LoggingConfig | None:
         if cls._config_model is None:
             return None
         return cls._config_model.logging
-
-    @classmethod
-    def get_app_config_model(cls) -> AppConfig | None:
-        if cls._config_model is None:
-            return None
-        return cls._config_model.app
-
-    @classmethod
-    def get_modules_config(cls) -> ModulesConfig | None:
-        if cls._config_model is None:
-            return None
-        return cls._config_model.modules
 
     @classmethod
     def get_module_model(cls, module_name: str) -> ModuleConfig | None:
@@ -264,9 +232,3 @@ class Config:
             return None
         # Safe dict lookup
         return cls._module_configs.get(module_name, None)
-
-
-def get_config(config_path: str) -> ConfigModel | None:
-    """Convenience: load the config and return the parsed ConfigModel on success."""
-    Config.set_config(config_path)
-    return Config.get_config_model()

@@ -12,7 +12,7 @@ src/
 │   ├── service.py          base64 input → planned path → output
 │   ├── pdfops.py           PDF-only operations (split / extract / rotate / encrypt / images)
 │   └── engines/
-│       ├── base.py           Subprocess execution, temporary workspace, timeout, component discovery
+│       ├── base.py           Engine interface, subprocess execution with timeout, temporary workspace
 │       ├── discovery.py      Cross-platform executable lookup (PATH plus known install locations)
 │       ├── libreoffice.py    Office ↔ PDF, layout fidelity
 │       ├── pandoc.py         Text formats, structural fidelity

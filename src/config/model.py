@@ -5,7 +5,9 @@ its model here and add it to ConfigModel.
 """
 
 
-from pydantic import BaseModel, ConfigDict
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ServerConfig(BaseModel):
@@ -49,8 +51,16 @@ class ConvertConfig(BaseModel):
     message) or the service-layer check is never reached.
     """
     max_input_mb: int = 50
-    engine_timeout_sec: int = 180
+    # Seconds allowed per engine call. None (ENGINE_TIMEOUT unset) keeps each engine's own
+    # default: LibreOffice 180, Pandoc 120, OCR 300. A value applies to every engine.
+    engine_timeout_sec: Optional[int] = Field(default=None, gt=0)
     max_hops: int = 3
+
+    @field_validator("engine_timeout_sec", mode="before")
+    @classmethod
+    def _blank_timeout_is_unset(cls, v):
+        # config.yaml writes ${ENGINE_TIMEOUT:-}, which arrives as "" when the variable is unset
+        return None if v is None or (isinstance(v, str) and not v.strip()) else v
 
 
 class AppConfig(BaseModel):

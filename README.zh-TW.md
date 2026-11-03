@@ -142,7 +142,7 @@ client ──(bearer token)──▶ /mcp ──▶ tools ──▶ service.py �
 | `ANYDOC_BASE_URL` | `http://127.0.0.1:5055` | 本伺服器對外的位址。token 的 audience 為 `<ANYDOC_BASE_URL>/mcp`，必須等於在 MCP Gate 註冊的服務；也會出現在 protected-resource metadata 中。 |
 | `AUTH_ENABLED` | `true` | 只有本機實驗時才設為 `false`。 |
 | `MAX_INPUT_MB` | `50` | 單檔上限；同時提高 MCP 傳輸層的 body 上限（×1.5）。 |
-| `ENGINE_TIMEOUT` | `180` | 每次引擎呼叫的秒數上限。 |
+| `ENGINE_TIMEOUT` | 各引擎預設 | 每次引擎呼叫的秒數上限，套用到所有引擎。未設定時各引擎維持自己的上限：LibreOffice 180、Pandoc 120、OCR 300。 |
 | `LOG_LEVEL` | `INFO` | |
 
 YAML 中的 `auth.required_scopes` 可要求每個 token 都必須帶有某個 scope（例如 `mcp:tools:invoke`）；`auth.audience` 則可在註冊的 resource URI 不是 `<base_url>/mcp` 的少數情況下覆寫推導值。

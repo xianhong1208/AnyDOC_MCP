@@ -41,7 +41,7 @@ class TextEngine(ConversionEngine):
             )
 
         def _run() -> str:
-            text = _decode(data, src, dst)
+            text = _decode_text(data, src, dst)
             return _tsv_to_table(text) if src == "tsv" else f"```{src}\n{text.strip()}\n```"
 
         result = (await asyncio.to_thread(_run)).encode("utf-8")
@@ -49,7 +49,7 @@ class TextEngine(ConversionEngine):
         return result
 
 
-def _decode(data: bytes, src: str, dst: str) -> str:
+def _decode_text(data: bytes, src: str, dst: str) -> str:
     for encoding in ("utf-8", "utf-8-sig", "big5", "latin-1"):
         try:
             return data.decode(encoding)
@@ -71,16 +71,16 @@ def _tsv_to_table(text: str) -> str:
     header, *body = rows
     width = len(header)
     lines = [
-        "| " + " | ".join(_escape(c) for c in header) + " |",
+        "| " + " | ".join(_escape_table_cell(c) for c in header) + " |",
         "| " + " | ".join(["---"] * width) + " |",
     ]
     for row in body:
         # Pad or trim to the header width, otherwise the Markdown table breaks
         cells = (row + [""] * width)[:width]
-        lines.append("| " + " | ".join(_escape(c) for c in cells) + " |")
+        lines.append("| " + " | ".join(_escape_table_cell(c) for c in cells) + " |")
     return "\n".join(lines) + truncated
 
 
-def _escape(cell: str) -> str:
+def _escape_table_cell(cell: str) -> str:
     """A | inside a cell would split the table"""
     return cell.replace("|", "\\|").replace("\n", " ").strip()

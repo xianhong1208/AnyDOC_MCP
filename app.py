@@ -33,20 +33,23 @@ def _load_instructions(path: Path = _INSTRUCTIONS_PATH) -> str:
 def _apply_convert_config(config: BaseModel) -> None:
     """Push `config.convert` into the modules that own the corresponding constants.
 
-    These used to be three hard-coded constants, which made the `convert:` section of
-    config.yaml silently ineffective - the hardest kind of configuration bug to notice.
+    max_input_mb, max_hops and engine_timeout_sec used to be hard-coded only, which made
+    the `convert:` section of config.yaml silently ineffective - the hardest kind of
+    configuration bug to notice. An unset engine_timeout_sec keeps each engine's default.
     """
     convert = getattr(config, "convert", None)
     if convert is None:
         return
 
     from src.domain.convert import registry, service
+    from src.domain.convert.engines import base
 
     service.MAX_INPUT_MB = convert.max_input_mb
     registry.MAX_HOPS = convert.max_hops
+    base.ENGINE_TIMEOUT_SEC = convert.engine_timeout_sec
     api_logger.info(
         f"Convert config: max_input={convert.max_input_mb}MB, "
-        f"max_hops={convert.max_hops}, engine_timeout={convert.engine_timeout_sec}s"
+        f"max_hops={convert.max_hops}, engine_timeout={f'{convert.engine_timeout_sec}s' if convert.engine_timeout_sec else 'engine defaults'}"
     )
 
 
