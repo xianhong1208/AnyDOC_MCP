@@ -5,7 +5,7 @@ its model here and add it to ConfigModel.
 """
 
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -15,6 +15,27 @@ class ServerConfig(BaseModel):
     host: str
     port: int
     transport: str = "http"
+
+
+class RevocationConfig(BaseModel):
+    """MCP Gate's revocation feed (`auth.revocation`).
+
+    AnyDoc verifies tokens offline, so without this a token revoked in MCP Gate keeps
+    working until it expires. When enabled, a background task polls
+    `<issuer>/oauth/revoked` and the /mcp verifier rejects listed tokens. The
+    credentials belong to a confidential client registered in the MCP Gate console and
+    bound to this server as its resource server.
+    """
+    enabled: bool = False
+    client_id: str | None = None
+    # Must be an ${ENV_VAR} reference; a literal secret in config.yaml is refused at startup.
+    client_secret: str | None = Field(None, repr=False)
+    poll_interval_sec: float = Field(30, ge=5, le=3600)
+    # "open": keep accepting tokens when the feed is unreachable (logged loudly);
+    # "closed": reject every token once no poll has succeeded for
+    # stale_after_intervals x poll_interval_sec.
+    fail_mode: Literal["open", "closed"] = "open"
+    stale_after_intervals: int = Field(4, ge=2, le=100)
 
 
 class AuthConfig(BaseModel):
@@ -29,6 +50,8 @@ class AuthConfig(BaseModel):
     audience: str | None = None
     base_url: str | None = None
     required_scopes: list[str] = []
+    # MCP Gate revocation feed (off by default; needs a resource-server client).
+    revocation: RevocationConfig = Field(default_factory=RevocationConfig)
 
 
 class LoggingConfig(BaseModel):

@@ -66,6 +66,21 @@ def _expand_env_vars(value: Any) -> Any:
     return value
 
 
+def env_refs(raw: Any, prefix: str = "") -> dict[str, str]:
+    """Map dotted path -> first referenced env-var name for every raw (pre-expansion) string
+    containing ``${VAR}``. Lets the server tell a secret that came from the environment from
+    one written literally into config.yaml, a difference expansion erases."""
+    out: dict[str, str] = {}
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            out.update(env_refs(v, f"{prefix}.{k}" if prefix else str(k)))
+    elif isinstance(raw, str):
+        m = _ENV_VAR_PATTERN.search(raw)
+        if m:
+            out[prefix] = m.group(1)
+    return out
+
+
 def _load_dotenv_if_available() -> None:
     """Load .env from the working directory if python-dotenv is installed (optional)."""
     try:
@@ -81,6 +96,8 @@ class Config:
     _config: dict[str, Any] = {}
     _config_model: ConfigModel | None = None
     _module_configs: dict[str, ModuleConfig] = {}  # dict storage avoids setattr injection
+    # Dotted path -> env-var name for values written as ${VAR} in the yaml (pre-expansion).
+    _env_refs: dict[str, str] = {}
     
     @classmethod
     def _validate_config_path(cls, config_path: str) -> Path:
@@ -192,6 +209,7 @@ class Config:
             if config_file_path.exists():
                 with open(config_file_path, 'r', encoding='utf-8') as file:
                     raw_config = yaml.safe_load(file) or {}
+                cls._env_refs = env_refs(raw_config)
                 cls._config = _expand_env_vars(raw_config)
             else:
                 raise FileNotFoundError(f"Config file not found: {config_path}")
@@ -204,6 +222,11 @@ class Config:
             traceback.print_exc()
             cls._config = {}
     
+    @classmethod
+    def get_env_refs(cls) -> dict[str, str]:
+        """Dotted path -> env-var name for config values written as ${VAR} references."""
+        return dict(cls._env_refs)
+
     @classmethod
     def get_config_model(cls) -> ConfigModel | None:
         """Return the parsed Pydantic ConfigModel, if any."""

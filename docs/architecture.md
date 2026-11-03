@@ -20,7 +20,7 @@ src/
 │       ├── ocr.py            Image / scanned PDF → text (Tesseract)
 │       ├── image.py          Image ↔ image (Pillow)
 │       └── text.py           JSON / XML / TSV → Markdown
-├── auth/                   OAuth 2.1 resource-server wiring (JWKS verification)
+├── auth/                   OAuth 2.1 resource-server wiring (JWKS verification, revocation feed)
 └── fastmcp_tools/
     └── anydoc_tools.py     MCP tool layer
 ```
@@ -176,6 +176,8 @@ Plans computed with `allow_quality_loss=false` (`prefer_fidelity=True`):
 ## Authentication
 
 AnyDoc is an OAuth 2.1 resource server. It issues no tokens and stores no users. `src/auth/` configures FastMCP's `JWTVerifier` with `jwks_uri = <MCP_GATE_URL>/.well-known/jwks.json`, the expected issuer and audience, and optional `required_scopes`; RS256 bearer tokens issued by [MCP Gate](https://github.com/xianhong1208/MCP_Gate) are verified offline against that JWKS. The server publishes `/.well-known/oauth-protected-resource/mcp` so OAuth-aware MCP clients can discover the authorisation server.
+
+Offline verification alone cannot see revocations, so `auth.revocation` (off by default) adds MCP Gate's revocation feed: `src/auth/revocation.py` runs a poller for the app's lifetime (started and stopped in `create_app`'s lifespan) that mirrors `POST <issuer>/oauth/revoked` into an in-memory `jti -> exp` map — a full fetch first and hourly, incremental `since` polls in between, jitter and exponential backoff on errors — and `src/auth/fastmcp_verifier.py` (a `JWTVerifier` subclass) rejects listed `jti`s with the usual 401 `invalid_token`. `fail_mode: open` keeps accepting tokens while the feed is unreachable; `closed` rejects all of them once the list is stale. The feed needs a confidential client bound to AnyDoc in MCP Gate (README → *Token revocation*); its state is reported by `GET /health`.
 
 ## Testing
 

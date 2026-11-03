@@ -4,13 +4,14 @@ This file only wires things together; behaviour lives in the individual modules.
 Add features in those modules, not here.
 """
 import importlib
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
-from src.auth import build_auth_provider, resolve_auth_settings
+from src.auth import build_auth_provider, init_revocation, resolve_auth_settings, revocation_lifespan
 from src.config.config_manager import Config
 from src.log import get_api_logger
 from src.middleware.request_id import RequestIdMiddleware
@@ -115,12 +116,21 @@ def create_app(config: BaseModel, transport: str):
     mcp = FastMCP(name=app_name, version=app_version, instructions=instructions, auth=auth)
     mcp_app = mcp.http_app(transport=transport)
 
+    # --- MCP Gate revocation feed: built here, polled for the app's lifetime (no-op when off) ---
+    init_revocation(config, env_refs=Config.get_env_refs())
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async with mcp_app.lifespan(app):
+            async with revocation_lifespan():
+                yield
+
     # --- FastAPI instance ---
     fastapi_app = FastAPI(
         title=app_title,
         description=app_description,
         version=app_version,
-        lifespan=mcp_app.lifespan,
+        lifespan=lifespan,
     )
     fastapi_app.state.config = config
     fastapi_app.state.instructions = instructions
