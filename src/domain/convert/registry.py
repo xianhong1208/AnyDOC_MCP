@@ -194,10 +194,20 @@ def available_engines() -> dict[str, bool]:
     return {name: engine.is_available() for name, engine in ENGINES.items()}
 
 
+def _is_usable(route: Route) -> bool:
+    """Whether the route's engine can really run it on this machine"""
+    return ENGINES[route.engine].can_handle(route.src, route.dst)
+
+
+def format_path(plan: list[Route]) -> str:
+    """Render a non-empty plan as 'src → intermediate → dst'"""
+    return " → ".join([plan[0].src] + [r.dst for r in plan])
+
+
 def direct_route(src: str, dst: str) -> Route | None:
     """Look up a single-hop route; treated as absent if unusable on this machine"""
     route = DIRECT_ROUTES.get((src, dst))
-    if route and ENGINES[route.engine].can_handle(src, dst):
+    if route and _is_usable(route):
         return route
     return None
 
@@ -205,9 +215,9 @@ def direct_route(src: str, dst: str) -> Route | None:
 def _adjacency() -> dict[str, dict[str, Route]]:
     """Turn the route table into an adjacency map containing only edges usable here"""
     graph: dict[str, dict[str, Route]] = {}
-    for (src, dst), route in DIRECT_ROUTES.items():
-        if ENGINES[route.engine].can_handle(src, dst):
-            graph.setdefault(src, {})[dst] = route
+    for route in DIRECT_ROUTES.values():
+        if _is_usable(route):
+            graph.setdefault(route.src, {})[route.dst] = route
     return graph
 
 
@@ -355,10 +365,7 @@ def plan_conversion(src: str, dst: str, prefer_fidelity: bool = True) -> list[Ro
             for r in best
         ]
 
-    logger.info(
-        f"Planned {src} → {dst} in {len(best)} hop(s): "
-        + " → ".join([best[0].src] + [r.dst for r in best])
-    )
+    logger.info(f"Planned {src} → {dst} in {len(best)} hop(s): {format_path(best)}")
     return best
 
 
@@ -381,7 +388,7 @@ def capability_matrix() -> dict[str, list[str]]:
     policy and are not promised here.
     """
     matrix: dict[str, list[str]] = {}
-    for (src, dst), route in DIRECT_ROUTES.items():
-        if ENGINES[route.engine].can_handle(src, dst):
-            matrix.setdefault(src, []).append(dst)
+    for route in DIRECT_ROUTES.values():
+        if _is_usable(route):
+            matrix.setdefault(route.src, []).append(route.dst)
     return {src: sorted(dsts) for src, dsts in sorted(matrix.items())}

@@ -28,7 +28,12 @@ from fastmcp.utilities.types import File
 from pydantic import Field
 
 from src.domain.convert import pdfops
-from src.domain.convert.registry import available_engines, capability_matrix
+from src.domain.convert.registry import (
+    FIDELITY_LOSSY,
+    available_engines,
+    capability_matrix,
+    format_path,
+)
 from src.domain.convert.service import convert_artifact, resolve_artifact_input
 from src.domain.convert.types import FALLBACK_NAME as _FALLBACK_NAME
 from src.domain.convert.types import mime_type_for
@@ -138,7 +143,7 @@ def _fidelity_warning(plan) -> str:
     """
     if not plan:
         return ""
-    lossy = [r for r in plan if r.fidelity == "lossy"]
+    lossy = [r for r in plan if r.fidelity == FIDELITY_LOSSY]
     if lossy:
         # The wording must be precise about what survived and what did not.
         # The old text said "images have been lost", which stopped being true
@@ -286,9 +291,7 @@ def register_anydoc_tools(mcp: FastMCP):
             output_name=output_name,
         )
 
-        path_desc = (
-            " → ".join([plan[0].src] + [r.dst for r in plan]) if plan else "no conversion needed"
-        )
+        path_desc = format_path(plan) if plan else "no conversion needed"
         engines_used = ", ".join(r.engine for r in plan) if plan else "-"
         summary = (
             f"Conversion complete: {output.name}.{output.fmt}\n"
