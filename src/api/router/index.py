@@ -136,7 +136,6 @@ _PAGE = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%%TITLE%%</title>
-%%FAVICON%%
 <style>
 :root{--brand:#0a4d8c;--brand-dark:#063a6b;--bg:#f5f7fa;--card:#fff;--text:#1f2933;--muted:#6b7280;--border:#e5e7eb;}
 *{box-sizing:border-box;}
@@ -214,11 +213,9 @@ async def index(request: Request) -> HTMLResponse:
     )
 
     topbar = '  <div class="topbar"><span class="wordmark">AnyDoc</span></div>'
-    favicon = ""
 
     page = (
         _PAGE
-        .replace("%%FAVICON%%", favicon)
         .replace("%%TOPBAR%%", topbar)
         .replace("%%TITLE%%", html.escape(title))
         .replace("%%VERSION%%", html.escape(str(version)))

@@ -17,8 +17,6 @@ from src.domain.convert.engines.libreoffice import (
 from src.domain.convert.engines.pandoc import _NEEDS_STANDALONE, PandocEngine
 from src.domain.convert.engines.text import TextEngine
 
-SAMPLE_MD = b"# %E6%A8%99%E9%A1%8C\n"  # placeholder; each test supplies its own content
-
 
 @pytest.fixture
 def pandoc():

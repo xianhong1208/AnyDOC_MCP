@@ -106,14 +106,6 @@ def _search(name: str) -> str | None:
     return None
 
 
-def clear_cache() -> None:
-    """Clear the discovery cache
-
-    For tests, or to re-detect after installing a dependency without restarting.
-    """
-    _cache.clear()
-
-
 def path_to_file_url(path: Path) -> str:
     """Convert a path to a file:// URL for LibreOffice's -env:UserInstallation
 

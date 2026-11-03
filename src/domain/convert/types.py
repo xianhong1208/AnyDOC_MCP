@@ -71,7 +71,6 @@ _EXT_ALIASES = {
     "mdown": "md",
     "text": "txt",
     "latex": "tex",
-    "yml": "yaml",
     "docm": "docx",
     "dotx": "docx",
     "xlsm": "xlsx",

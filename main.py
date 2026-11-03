@@ -13,8 +13,6 @@ from app import create_app
 from src.config.config_manager import Config
 from src.log import get_server_logger, setup_logger
 
-logger = get_server_logger()
-
 
 def main():
     parser = argparse.ArgumentParser(

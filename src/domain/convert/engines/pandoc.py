@@ -68,10 +68,6 @@ class PandocEngine(CliEngine):
     name = "pandoc"
     binary = "pandoc"
 
-    @classmethod
-    def supports(cls, src: str, dst: str) -> bool:
-        return src in _PANDOC_READER and dst in _PANDOC_WRITER
-
     async def convert(self, data: bytes, src: str, dst: str, **opts) -> bytes:
         reader = _PANDOC_READER.get(src)
         writer = _PANDOC_WRITER.get(dst)

@@ -1,6 +1,6 @@
 """Configuration: YAML loading, env-var expansion and Pydantic models."""
 
-from .config_manager import Config, get_config
+from .config_manager import Config
 from .model import (
     AppConfig,
     AuthConfig,
@@ -28,5 +28,4 @@ __all__ = [
     "ModulesConfig",
     "RouterConfig",
     "ServerConfig",
-    "get_config",
 ]

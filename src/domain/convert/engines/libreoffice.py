@@ -138,9 +138,8 @@ class LibreOfficeEngine(CliEngine):
             await self._run(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout)
 
             # soffice does not accept a custom output name; pick it up by extension
-            ext = dst if dst != "txt" else "txt"
             try:
-                produced = ws.find_one(f"input.{ext}")
+                produced = ws.find_one(f"input.{dst}")
             except FileNotFoundError:
                 raise ConversionFailedError(
                     self.name, src, dst,
