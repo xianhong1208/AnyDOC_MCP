@@ -20,6 +20,16 @@ auth:
   issuer: "${MCP_GATE_URL:-http://localhost:4568}"
   base_url: "${ANYDOC_BASE_URL:-http://127.0.0.1:5055}"
   required_scopes: []
+  # MCP Gate revocation feed: without it a token revoked in MCP Gate keeps working here
+  # until it expires. Needs a confidential client bound to this server in MCP Gate
+  # (README -> "Token revocation"). The secret must stay an ${ENV_VAR} reference.
+  revocation:
+    enabled: ${ANYDOC_REVOCATION_ENABLED:-false}
+    client_id: "${ANYDOC_REVOCATION_CLIENT_ID:-}"
+    client_secret: "${ANYDOC_REVOCATION_CLIENT_SECRET:-}"
+    poll_interval_sec: ${ANYDOC_REVOCATION_POLL_INTERVAL:-30}   # a revocation takes effect within about this long
+    fail_mode: "${ANYDOC_REVOCATION_FAIL_MODE:-open}"          # open | closed (reject all tokens when the feed is stale)
+    stale_after_intervals: 4                                   # "stale" = no successful poll for 4 x poll_interval_sec
 
 logging:
   level: "${LOG_LEVEL:-INFO}"
