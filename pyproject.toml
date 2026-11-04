@@ -20,7 +20,7 @@ dependencies = [
     # are system packages; see the Dockerfile.
     "firecrawl-anydoc>=0.1.8",   # document -> Markdown (Rust, MIT)
     "pypdf>=5.0.0",              # PDF split / merge / rotate / encrypt
-    "pillow>=11.0.0",            # image conversion
+    "pillow>=13.0.0",            # image conversion (13.0 fixes the 12.x advisories)
 ]
 # Stateless service: no sqlalchemy / alembic / psycopg2
 
