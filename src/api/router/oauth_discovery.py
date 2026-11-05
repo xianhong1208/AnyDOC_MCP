@@ -64,10 +64,10 @@ class WellKnownCORSMiddleware:
         await self.app(scope, receive, send_with_cors)
 
 _CACHE_TTL_SEC = 300
-_cache: dict[str, tuple[float, dict]] = {}
+_issuer_document_cache: dict[str, tuple[float, dict]] = {}
 
 
-def _settings(request: Request) -> AuthSettings:
+def _auth_settings_or_404(request: Request) -> AuthSettings:
     settings = getattr(request.app.state, "auth_settings", None)
     if settings is None:
         raise HTTPException(status_code=404, detail="authentication is disabled")
@@ -87,35 +87,37 @@ def protected_resource_metadata(settings: AuthSettings) -> dict:
 async def fetch_issuer_document(settings: AuthSettings, well_known: str) -> dict:
     """Fetch `<issuer>/.well-known/<name>` from MCP Gate with a short cache."""
     url = f"{settings.issuer}/.well-known/{well_known}"
-    cached = _cache.get(url)
+    cached = _issuer_document_cache.get(url)
     if cached and cached[0] > time.monotonic():
         return cached[1]
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            r = await client.get(url)
-            r.raise_for_status()
-            doc = r.json()
+            response = await client.get(url)
+            response.raise_for_status()
+            doc = response.json()
     except Exception as e:  # noqa: BLE001 - any failure means the AS is unreachable
         logger.warning(f"Could not fetch {url}: {e}")
         raise HTTPException(status_code=502, detail=f"authorization server unreachable: {url}") from e
-    _cache[url] = (time.monotonic() + _CACHE_TTL_SEC, doc)
+    _issuer_document_cache[url] = (time.monotonic() + _CACHE_TTL_SEC, doc)
     return doc
 
 
 def clear_cache() -> None:
-    _cache.clear()
+    _issuer_document_cache.clear()
 
 
 @router.get("/.well-known/oauth-protected-resource")
 async def oauth_protected_resource(request: Request) -> JSONResponse:
-    return JSONResponse(protected_resource_metadata(_settings(request)))
+    return JSONResponse(protected_resource_metadata(_auth_settings_or_404(request)))
 
 
 @router.get("/.well-known/oauth-authorization-server")
 async def oauth_authorization_server(request: Request) -> JSONResponse:
-    return JSONResponse(await fetch_issuer_document(_settings(request), "oauth-authorization-server"))
+    settings = _auth_settings_or_404(request)
+    return JSONResponse(await fetch_issuer_document(settings, "oauth-authorization-server"))
 
 
 @router.get("/.well-known/openid-configuration")
 async def openid_configuration(request: Request) -> JSONResponse:
-    return JSONResponse(await fetch_issuer_document(_settings(request), "openid-configuration"))
+    settings = _auth_settings_or_404(request)
+    return JSONResponse(await fetch_issuer_document(settings, "openid-configuration"))

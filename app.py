@@ -4,13 +4,14 @@ This file only wires things together; behaviour lives in the individual modules.
 Add features in those modules, not here.
 """
 import importlib
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
-from src.auth import build_auth_provider, resolve_auth_settings
+from src.auth import build_auth_provider, init_revocation, resolve_auth_settings, revocation_lifespan
 from src.config.config_manager import Config
 from src.log import get_api_logger
 from src.middleware.request_id import RequestIdMiddleware
@@ -33,20 +34,23 @@ def _load_instructions(path: Path = _INSTRUCTIONS_PATH) -> str:
 def _apply_convert_config(config: BaseModel) -> None:
     """Push `config.convert` into the modules that own the corresponding constants.
 
-    These used to be three hard-coded constants, which made the `convert:` section of
-    config.yaml silently ineffective - the hardest kind of configuration bug to notice.
+    max_input_mb, max_hops and engine_timeout_sec used to be hard-coded only, which made
+    the `convert:` section of config.yaml silently ineffective - the hardest kind of
+    configuration bug to notice. An unset engine_timeout_sec keeps each engine's default.
     """
     convert = getattr(config, "convert", None)
     if convert is None:
         return
 
     from src.domain.convert import registry, service
+    from src.domain.convert.engines import base
 
     service.MAX_INPUT_MB = convert.max_input_mb
     registry.MAX_HOPS = convert.max_hops
+    base.ENGINE_TIMEOUT_SEC = convert.engine_timeout_sec
     api_logger.info(
         f"Convert config: max_input={convert.max_input_mb}MB, "
-        f"max_hops={convert.max_hops}, engine_timeout={convert.engine_timeout_sec}s"
+        f"max_hops={convert.max_hops}, engine_timeout={f'{convert.engine_timeout_sec}s' if convert.engine_timeout_sec else 'engine defaults'}"
     )
 
 
@@ -112,12 +116,21 @@ def create_app(config: BaseModel, transport: str):
     mcp = FastMCP(name=app_name, version=app_version, instructions=instructions, auth=auth)
     mcp_app = mcp.http_app(transport=transport)
 
+    # --- MCP Gate revocation feed: built here, polled for the app's lifetime (no-op when off) ---
+    init_revocation(config, env_refs=Config.get_env_refs())
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async with mcp_app.lifespan(app):
+            async with revocation_lifespan():
+                yield
+
     # --- FastAPI instance ---
     fastapi_app = FastAPI(
         title=app_title,
         description=app_description,
         version=app_version,
-        lifespan=mcp_app.lifespan,
+        lifespan=lifespan,
     )
     fastapi_app.state.config = config
     fastapi_app.state.instructions = instructions

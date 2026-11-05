@@ -71,7 +71,6 @@ _EXT_ALIASES = {
     "mdown": "md",
     "text": "txt",
     "latex": "tex",
-    "yml": "yaml",
     "docm": "docx",
     "dotx": "docx",
     "xlsm": "xlsx",
@@ -110,6 +109,41 @@ _MIME_MAP = {
     "image/gif": "gif",
     "image/bmp": "bmp",
     "image/tiff": "tiff",
+}
+
+# Normalized code -> the MIME type a produced file is labelled with. Every format
+# in ALL_FORMATS needs an entry: without one, fastmcp's File falls back to
+# "application/<format>" ("application/docx", "application/png"), which no client
+# recognizes. Kept separate from _MIME_MAP, which also accepts alternative
+# spellings on input (text/rtf, text/xml) and deliberately omits some types.
+FORMAT_MIME_TYPES = {
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "doc": "application/msword",
+    "odt": "application/vnd.oasis.opendocument.text",
+    "rtf": "application/rtf",
+    "epub": "application/epub+zip",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "xls": "application/vnd.ms-excel",
+    "ods": "application/vnd.oasis.opendocument.spreadsheet",
+    "csv": "text/csv",
+    "tsv": "text/tab-separated-values",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "ppt": "application/vnd.ms-powerpoint",
+    "odp": "application/vnd.oasis.opendocument.presentation",
+    "md": "text/markdown",
+    "html": "text/html",
+    "txt": "text/plain",
+    "rst": "text/x-rst",
+    "tex": "application/x-tex",
+    "json": "application/json",
+    "xml": "application/xml",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "webp": "image/webp",
+    "gif": "image/gif",
+    "bmp": "image/bmp",
+    "tiff": "image/tiff",
 }
 
 # Magic bytes -> normalized code. Formats that can be settled from the first few
@@ -274,7 +308,7 @@ def _sniff_zip(data: bytes) -> str | None:
     return None
 
 
-def _ole_directory(data: bytes) -> bytes:
+def _read_ole_directory(data: bytes) -> bytes:
     """Locate the directory sectors from the OLE2 header and return them
 
     Scanning the start of the file is not enough: an OLE2 directory can live
@@ -315,7 +349,7 @@ def _sniff_ole(data: bytes) -> str | None:
     `WORKBOOK` / `Book`). anydoc's detect.rs uses `eq_ignore_ascii_case` for
     this and explicitly notes "producers vary"; this mirrors that approach.
     """
-    regions = [_ole_directory(data)]
+    regions = [_read_ole_directory(data)]
     if not regions[0]:
         # Fallback when the header is untrustworthy: scan a slice at each end.
         # In practice the directory is either near the start or at the very end.
@@ -385,6 +419,11 @@ def detect_format(
             return "pdf"
 
     return None
+
+
+def mime_type_for(fmt: str) -> str:
+    """MIME type to label an output file of normalized format `fmt` with"""
+    return FORMAT_MIME_TYPES.get(fmt, "application/octet-stream")
 
 
 def stem_of(file_name: str | None, default: str = FALLBACK_NAME) -> str:

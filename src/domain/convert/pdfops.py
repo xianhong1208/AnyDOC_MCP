@@ -16,12 +16,24 @@ from src.log import get_mcptools_logger
 logger = get_mcptools_logger()
 
 
+def _pypdf_error(reason: str) -> ConversionFailedError:
+    """Every PDF operation is pdf -> pdf in the pypdf "engine"."""
+    return ConversionFailedError("pypdf", "pdf", "pdf", reason)
+
+
 def _require_pypdf():
     try:
         from pypdf import PdfReader, PdfWriter
         return PdfReader, PdfWriter
     except ImportError:
-        raise ConversionFailedError("pypdf", "pdf", "pdf", "pypdf not installed")
+        raise _pypdf_error("pypdf not installed")
+
+
+def _pdf_bytes(writer) -> bytes:
+    """Serialize a PdfWriter to bytes"""
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
 
 
 def parse_page_range(spec: str, total: int) -> list[int]:
@@ -49,14 +61,12 @@ def parse_page_range(spec: str, total: int) -> list[int]:
             else:
                 start = end = int(chunk)
         except ValueError:
-            raise ConversionFailedError(
-                "pypdf", "pdf", "pdf",
+            raise _pypdf_error(
                 f"invalid page range syntax: '{chunk}' (expected e.g. '1-3,7,10-')",
             )
 
         if start < 1 or end > total or start > end:
-            raise ConversionFailedError(
-                "pypdf", "pdf", "pdf",
+            raise _pypdf_error(
                 f"page range '{chunk}' out of bounds (document has {total} pages)",
             )
         pages.extend(range(start - 1, end))
@@ -77,7 +87,7 @@ async def page_count(data: bytes) -> int:
     except ConversionFailedError:
         raise
     except Exception as e:
-        raise ConversionFailedError("pypdf", "pdf", "pdf", str(e)[:500])
+        raise _pypdf_error(str(e)[:500])
 
 
 async def extract_pages(data: bytes, page_spec: str) -> bytes:
@@ -90,9 +100,7 @@ async def extract_pages(data: bytes, page_spec: str) -> bytes:
         writer = PdfWriter()
         for i in indices:
             writer.add_page(reader.pages[i])
-        buffer = io.BytesIO()
-        writer.write(buffer)
-        return buffer.getvalue()
+        return _pdf_bytes(writer)
 
     result = await asyncio.to_thread(_run)
     logger.info(f"[pypdf] extract '{page_spec}': {len(result)} bytes")
@@ -102,9 +110,7 @@ async def extract_pages(data: bytes, page_spec: str) -> bytes:
 async def split_pdf(data: bytes, pages_per_chunk: int = 1) -> list[tuple[str, bytes]]:
     """Split the PDF into several parts; returns [(name suffix, bytes), ...]"""
     if pages_per_chunk < 1:
-        raise ConversionFailedError(
-            "pypdf", "pdf", "pdf", "pages_per_chunk must be >= 1"
-        )
+        raise _pypdf_error("pages_per_chunk must be >= 1")
 
     def _run() -> list[tuple[str, bytes]]:
         PdfReader, PdfWriter = _require_pypdf()
@@ -116,10 +122,8 @@ async def split_pdf(data: bytes, pages_per_chunk: int = 1) -> list[tuple[str, by
             writer = PdfWriter()
             for i in range(start, end):
                 writer.add_page(reader.pages[i])
-            buffer = io.BytesIO()
-            writer.write(buffer)
             label = f"p{start + 1}" if end == start + 1 else f"p{start + 1}-{end}"
-            chunks.append((label, buffer.getvalue()))
+            chunks.append((label, _pdf_bytes(writer)))
         return chunks
 
     result = await asyncio.to_thread(_run)
@@ -130,7 +134,7 @@ async def split_pdf(data: bytes, pages_per_chunk: int = 1) -> list[tuple[str, by
 async def merge_pdfs(parts: list[bytes]) -> bytes:
     """Merge several PDFs in order"""
     if not parts:
-        raise ConversionFailedError("pypdf", "pdf", "pdf", "no input files to merge")
+        raise _pypdf_error("no input files to merge")
 
     def _run() -> bytes:
         PdfReader, PdfWriter = _require_pypdf()
@@ -140,13 +144,10 @@ async def merge_pdfs(parts: list[bytes]) -> bytes:
                 for page in PdfReader(io.BytesIO(blob)).pages:
                     writer.add_page(page)
             except Exception as e:
-                raise ConversionFailedError(
-                    "pypdf", "pdf", "pdf",
+                raise _pypdf_error(
                     f"input #{idx + 1} is not a readable PDF: {e}",
                 )
-        buffer = io.BytesIO()
-        writer.write(buffer)
-        return buffer.getvalue()
+        return _pdf_bytes(writer)
 
     result = await asyncio.to_thread(_run)
     logger.info(f"[pypdf] merged {len(parts)} files → {len(result)} bytes")
@@ -156,9 +157,7 @@ async def merge_pdfs(parts: list[bytes]) -> bytes:
 async def rotate_pages(data: bytes, degrees: int, page_spec: str = "") -> bytes:
     """Rotate the given pages (degrees must be a multiple of 90)"""
     if degrees % 90 != 0:
-        raise ConversionFailedError(
-            "pypdf", "pdf", "pdf", f"rotation must be a multiple of 90, got {degrees}"
-        )
+        raise _pypdf_error(f"rotation must be a multiple of 90, got {degrees}")
 
     def _run() -> bytes:
         PdfReader, PdfWriter = _require_pypdf()
@@ -170,9 +169,7 @@ async def rotate_pages(data: bytes, degrees: int, page_spec: str = "") -> bytes:
             if i in targets:
                 page.rotate(degrees)
             writer.add_page(page)
-        buffer = io.BytesIO()
-        writer.write(buffer)
-        return buffer.getvalue()
+        return _pdf_bytes(writer)
 
     return await asyncio.to_thread(_run)
 
@@ -256,7 +253,7 @@ async def encrypt_pdf(data: bytes, user_password: str,
                       owner_password: str | None = None) -> bytes:
     """Add an open password to the PDF"""
     if not user_password:
-        raise ConversionFailedError("pypdf", "pdf", "pdf", "password cannot be empty")
+        raise _pypdf_error("password cannot be empty")
 
     def _run() -> bytes:
         PdfReader, PdfWriter = _require_pypdf()
@@ -269,8 +266,6 @@ async def encrypt_pdf(data: bytes, user_password: str,
             owner_password=owner_password or user_password,
             algorithm="AES-256",
         )
-        buffer = io.BytesIO()
-        writer.write(buffer)
-        return buffer.getvalue()
+        return _pdf_bytes(writer)
 
     return await asyncio.to_thread(_run)
