@@ -54,4 +54,7 @@ RUN soffice --headless --terminate_after_init >/dev/null 2>&1 || true
 
 EXPOSE 5055
 
-CMD ["uv", "run", "python", "main.py", "--config", "config/config.yaml"]
+# --no-sync: the image is already synced without the dev group. A plain `uv run`
+# syncs the default groups, so every new container would download pytest and ruff
+# before starting, or fail to start without network.
+CMD ["uv", "run", "--no-sync", "python", "main.py", "--config", "config/config.yaml"]

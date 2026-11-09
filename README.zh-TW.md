@@ -183,6 +183,8 @@ uv run python scripts/mcp_smoke.py         # protocol check with a real MCP clie
 
 三層各自回答不同的問題 —— 邏輯對不對、引擎是否真的產出有效檔案、client 是否真的能使用這些工具 —— 而每一層都抓到過其他層抓不到的 bug。
 
+CI(`.github/workflows/ci.yml`)在每次 push 與對 `dev`、`main` 的 pull request 時跑這三層:先在 runner 上跑 ruff 與 pytest,再 build Docker image,並在容器內跑 `sweep_routes.py --strict`(被跳過的路線也算失敗)與 `mcp_smoke.py`,所以檢查到的引擎與字型就是實際出貨的那一套。
+
 ## 已知限制
 
 - 一次呼叫只處理一個檔案（尚無 `pdf_merge` 工具；合併邏輯已在 `pdfops` 中實作）。
@@ -190,6 +192,7 @@ uv run python scripts/mcp_smoke.py         # protocol check with a real MCP clie
 - PDF → 可編輯格式一定有損；PDF 內的表格以啟發式方式還原。
 - 圖片會保留，但附加在抽取出的 Markdown 末尾，而非原本的位置。
 - 不支援 `.xlsb`。
+- Pandoc 轉檔不會讀取文件所指向的檔案或網址：LaTeX 的 `\input` / `\lstinputlisting` / `\includegraphics`，以及用路徑或 `http(s)` 網址引用的圖片都會被略過（圖片保留 alt 文字）；文件內嵌或以 `data:` URI 提供的圖片會保留。
 - 撤銷不是即時的：啟用 [revocation feed](#token-撤銷) 時，被撤銷的 token 會在一個輪詢間隔內失效（預設 30 秒）；未啟用時則要等到過期。
 
 ## 貢獻

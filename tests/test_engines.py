@@ -286,3 +286,184 @@ class TestLossyConversionIsAllowedByDefault:
         from src.fastmcp_tools.anydoc_tools import _fidelity_warning
 
         assert _fidelity_warning([Route("docx", "pdf", "libreoffice", "high")]) == ""
+
+
+class TestPandocSandbox:
+    """Documents are untrusted, and pandoc without --sandbox reads whatever they point at.
+
+    A .tex upload holding \\lstinputlisting{/path} came back with that file's
+    contents (as root: .env included), and an <img> pointing at a local path is
+    pulled into a .docx. --sandbox limits pandoc to the input file it is given.
+    """
+
+    @pytest.mark.parametrize("src, dst", [("md", "docx"), ("tex", "md"), ("html", "docx"), ("md", "pptx")])
+    async def test_the_read_step_runs_sandboxed(self, monkeypatch, src, dst):
+        seen = {}
+
+        async def fake_run(self, argv, cwd, src, dst, timeout=None):
+            seen["argv"] = argv
+            raise RuntimeError("stop after the command is built")
+
+        monkeypatch.setattr(PandocEngine, "_run_command", fake_run)
+        with pytest.raises(RuntimeError):
+            await PandocEngine().convert(b"x", src, dst)
+        assert "--sandbox" in seen["argv"]
+
+    async def test_tex_cannot_include_a_file_from_the_server(self, pandoc, tmp_path):
+        secret = tmp_path / "secret.env"
+        secret.write_text("API_KEY=do-not-leak\n")
+        tex = (
+            "\\documentclass{article}\\begin{document}\n"
+            f"\\lstinputlisting{{{secret}}}\n\\input{{{secret}}}\n"
+            "\\end{document}\n"
+        )
+        out = await pandoc.convert(tex.encode(), "tex", "md")
+        assert b"do-not-leak" not in out
+
+    async def test_html_image_from_a_local_path_is_not_embedded(self, pandoc, tmp_path):
+        import io
+        import zipfile
+
+        from PIL import Image
+
+        image = tmp_path / "private.png"
+        Image.new("RGB", (4, 4), "red").save(image)
+        html = f'<html><body><p>x</p><img src="{image}"></body></html>'
+        out = await pandoc.convert(html.encode(), "html", "docx")
+        names = zipfile.ZipFile(io.BytesIO(out)).namelist()
+        assert not [n for n in names if n.startswith("word/media/")]
+
+    async def test_data_uri_images_are_still_embedded(self, pandoc):
+        """The PDF -> DOCX route carries images as data: URIs; the sandbox must keep them."""
+        import base64
+        import io
+        import zipfile
+
+        from PIL import Image
+
+        buf = io.BytesIO()
+        Image.new("RGB", (4, 4), "blue").save(buf, format="PNG")
+        md = f"# Figure\n\n![chart](data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()})\n"
+        out = await pandoc.convert(md.encode(), "md", "docx")
+        names = zipfile.ZipFile(io.BytesIO(out)).namelist()
+        assert [n for n in names if n.startswith("word/media/")]
+
+
+def _png() -> bytes:
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (4, 4), "green").save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _media(archive: bytes) -> list[str]:
+    import io
+    import zipfile
+
+    return [n for n in zipfile.ZipFile(io.BytesIO(archive)).namelist()
+            if n.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
+
+
+class TestPandocWriterOpensNothing:
+    """What reaches a writer must not name a server file: images, metadata, raw HTML."""
+
+    async def test_latex_includegraphics_of_a_server_file_is_dropped(self, pandoc, tmp_path):
+        image = tmp_path / "private.png"
+        image.write_bytes(_png())
+        tex = f"\\documentclass{{article}}\\begin{{document}}\n\\includegraphics{{{image}}}\n\\end{{document}}\n"
+        assert _media(await pandoc.convert(tex.encode(), "tex", "docx")) == []
+
+    async def test_epub_cover_image_metadata_is_dropped(self, pandoc, tmp_path):
+        image = tmp_path / "private.png"
+        image.write_bytes(_png())
+        md = f"---\ntitle: Book\ncover-image: {image}\n---\n\n# One\n\ntext\n"
+        out = await pandoc.convert(md.encode(), "md", "epub")
+        assert _media(out) == []
+        assert b"Book" in _epub_text(out)
+
+    async def test_raw_html_image_is_not_embedded_in_epub(self, pandoc, tmp_path):
+        image = tmp_path / "private.png"
+        image.write_bytes(_png())
+        md = f'# One\n\n<img src="{image}">\n\ntext\n'
+        assert _media(await pandoc.convert(md.encode(), "md", "epub")) == []
+
+    @pytest.mark.parametrize("dst", ["epub", "odt", "docx"])
+    async def test_images_embedded_in_a_docx_are_kept(self, pandoc, dst):
+        import base64
+
+        md = f"# Figure\n\n![chart](data:image/png;base64,{base64.b64encode(_png()).decode()})\n"
+        docx = await pandoc.convert(md.encode(), "md", "docx")
+        assert _media(docx)
+        assert _media(await pandoc.convert(docx, "docx", dst))
+
+    async def test_text_targets_are_unchanged(self, pandoc):
+        md = "---\ntitle: T\ncss: style.css\n---\n\n![remote](https://example.com/a.png)\n"
+        out = await pandoc.convert(md.encode(), "md", "md")
+        assert b"https://example.com/a.png" in out
+
+
+def _epub_text(archive: bytes) -> bytes:
+    import io
+    import zipfile
+
+    z = zipfile.ZipFile(io.BytesIO(archive))
+    return b"".join(z.read(n) for n in z.namelist() if n.endswith((".xhtml", ".opf")))
+
+
+class TestWithoutFileReferences:
+    """The AST filter on its own: what stays, what goes."""
+
+    @staticmethod
+    def image(url: str) -> dict:
+        return {"t": "Image", "c": [["", [], []], [{"t": "Str", "c": "alt"}], [url, ""]]}
+
+    def run(self, tmp_path, blocks, meta=None, epub=False):
+        from src.domain.convert.engines.pandoc import _without_file_references
+
+        media = tmp_path / "media"
+        (media / "media").mkdir(parents=True, exist_ok=True)
+        (media / "media" / "rId1.png").write_bytes(_png())
+        (tmp_path / "input.docx").write_bytes(b"not an image")
+        ast = {"pandoc-api-version": [1, 23], "meta": meta or {}, "blocks": blocks}
+        return _without_file_references(ast, media, epub=epub)
+
+    def para(self, *inlines):
+        return [{"t": "Para", "c": list(inlines)}]
+
+    @pytest.mark.parametrize("url", [
+        "/etc/hostname", "media/../input.docx", "../secret.env", "https://10.0.0.1/a.png",
+        "file:///etc/hostname", "\\\\host\\share\\a.png", "media/media/missing.png",
+    ])
+    def test_an_image_naming_anything_else_becomes_its_alt_text(self, tmp_path, url):
+        out = self.run(tmp_path, self.para(self.image(url)))
+        assert out["blocks"][0]["c"][0] == {"t": "Span", "c": [["", [], []], [{"t": "Str", "c": "alt"}]]}
+
+    def test_extracted_media_is_inlined(self, tmp_path):
+        out = self.run(tmp_path, self.para(self.image("media/media/rId1.png")))
+        assert out["blocks"][0]["c"][0]["c"][2][0].startswith("data:image/png;base64,")
+
+    def test_data_uri_is_kept(self, tmp_path):
+        out = self.run(tmp_path, self.para(self.image("data:image/png;base64,AAAA")))
+        assert out["blocks"][0]["c"][0]["c"][2][0] == "data:image/png;base64,AAAA"
+
+    def test_only_safe_metadata_is_kept_and_cleaned(self, tmp_path):
+        meta = {
+            "title": {"t": "MetaInlines", "c": [self.image("/etc/hostname")]},
+            "cover-image": {"t": "MetaString", "c": "/etc/hostname"},
+            "css": {"t": "MetaString", "c": "/etc/hostname"},
+        }
+        out = self.run(tmp_path, [], meta=meta)
+        assert set(out["meta"]) == {"title"}
+        assert out["meta"]["title"]["c"][0]["t"] == "Span"
+
+    def test_raw_html_goes_only_for_epub(self, tmp_path):
+        raw = {"t": "RawBlock", "c": ["html", '<img src="/etc/hostname">']}
+        assert self.run(tmp_path, [raw], epub=True)["blocks"] == []
+        assert self.run(tmp_path, [raw])["blocks"] == [raw]
+
+    def test_nulls_in_the_ast_survive(self, tmp_path):
+        caption = {"t": "Figure", "c": [["", [], []], [None, []], []]}
+        assert self.run(tmp_path, [caption])["blocks"] == [caption]

@@ -6,6 +6,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-11-09
+
+### Added
+- **Continuous integration** (`.github/workflows/ci.yml`): ruff and pytest on every push and pull request to `dev` and `main`, and a job that builds the Docker image, starts it, and runs `scripts/sweep_routes.py --strict` and `scripts/mcp_smoke.py` inside the container against the engines and fonts that ship.
+
+### Fixed
+- `scripts/sweep_routes.py` exited 0 when routes failed, so nothing scripted could notice; it now exits 1, and with `--strict` also when a route was skipped for a missing engine.
+- The Docker image's `CMD` ran `uv run`, which syncs the default dependency groups: every new container downloaded pytest and ruff before starting, or failed to start without network. It now runs `uv run --no-sync`.
+
+### Security
+- Pandoc conversions could read any file the service can, and fetch URLs: a `.tex` upload with `\lstinputlisting{/path}` came back with that file's contents, and an image naming a local path or URL was pulled into a DOCX, ODT, PPTX, RTF or EPUB. A conversion now reads the document with `--sandbox` into pandoc's AST, then writes from an AST holding no file references: an image stays only when it is embedded in the source or a `data:` URI (otherwise it becomes its alt text), metadata is limited to title, author, date and similar fields (the EPUB writer opens `cover-image`, `css` and `stylesheet`), and raw HTML is dropped from EPUB output. The whole conversion cannot run with `--sandbox`: Debian's pandoc reads its DOCX/PPTX/EPUB/LaTeX templates from disk, which the sandbox blocks. A conversion now takes about 65 ms longer (two pandoc runs).
+
 ## [1.1.1] — 2026-11-09
 
 ### Fixed
@@ -32,7 +44,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 First release: a document conversion MCP server (Office ↔ PDF, Markdown ↔ Word, spreadsheets, presentations, images, OCR, PDF split / extract / rotate / encrypt) secured by MCP Gate OAuth 2.1.
 
-[Unreleased]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.1...dev
+[Unreleased]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.2.0...dev
+[1.2.0]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.1.0
 [1.0.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.0.0

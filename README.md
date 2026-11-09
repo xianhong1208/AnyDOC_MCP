@@ -183,6 +183,8 @@ uv run python scripts/mcp_smoke.py         # protocol check with a real MCP clie
 
 The three layers answer different questions — is the logic right, do the engines actually produce valid files, can a client really use the tools — and each has caught bugs the others cannot.
 
+CI (`.github/workflows/ci.yml`) runs all three on every push and pull request to `dev` and `main`: ruff and pytest on the runner, then it builds the Docker image and runs `sweep_routes.py --strict` (a skipped route fails too) and `mcp_smoke.py` inside the container, so the engines and fonts checked are the ones that ship.
+
 ## Known limits
 
 - One file per call (no `pdf_merge` tool yet; the merge logic exists in `pdfops`).
@@ -190,6 +192,7 @@ The three layers answer different questions — is the logic right, do the engin
 - PDF → editable formats is always lossy; tables inside PDFs are recovered heuristically.
 - Images are kept but appended at the end of extracted Markdown, not at their original position.
 - `.xlsb` is not supported.
+- Pandoc conversions never read files or URLs a document points at: LaTeX `\input` / `\lstinputlisting` / `\includegraphics` and images given as a path or `http(s)` URL are dropped (an image keeps its alt text); images embedded in the document or given as `data:` URIs are kept.
 - Revocation is not instant: with the [revocation feed](#token-revocation) a revoked token stops working within one poll interval (30 s by default); without it, at expiry.
 
 ## Contributing
