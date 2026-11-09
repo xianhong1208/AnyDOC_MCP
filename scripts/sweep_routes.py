@@ -1,6 +1,10 @@
 """Full-route smoke test: actually run every route the capability matrix claims.
 
-    uv run python scripts/sweep_routes.py
+    uv run python scripts/sweep_routes.py [--strict]
+
+Exits 1 when a route fails. With --strict, routes skipped for a missing fixture
+(an engine that is not installed) fail it too: CI runs it that way inside the
+Docker image, where every engine must be present.
 
 "The matrix says it is supported" is not the same as "it actually works"; this script
 finds the gap. Every route goes through the full service layer (plan_conversion ->
@@ -207,6 +211,9 @@ async def main():
         print("\nFailures:")
         for src, dst, engines, why in failures:
             print(f"  {src:>5} -> {dst:<5} [{','.join(engines):<22}] {why}")
+    strict = "--strict" in sys.argv[1:]
+    if failures or (strict and skipped):
+        sys.exit(1)
 
 
 asyncio.run(main())

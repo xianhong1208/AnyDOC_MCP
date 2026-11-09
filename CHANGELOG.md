@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Continuous integration** (`.github/workflows/ci.yml`): ruff and pytest on every push and pull request to `dev` and `main`, and a job that builds the Docker image, starts it, and runs `scripts/sweep_routes.py --strict` and `scripts/mcp_smoke.py` inside the container against the engines and fonts that ship.
+
+### Fixed
+- `scripts/sweep_routes.py` exited 0 when routes failed, so nothing scripted could notice; it now exits 1, and with `--strict` also when a route was skipped for a missing engine.
+- The Docker image's `CMD` ran `uv run`, which syncs the default dependency groups: every new container downloaded pytest and ruff before starting, or failed to start without network. It now runs `uv run --no-sync`.
+
 ## [1.1.1] — 2026-11-09
 
 ### Fixed
