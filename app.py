@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
+from src.version import get_version
 from src.auth import build_auth_provider, init_revocation, resolve_auth_settings, revocation_lifespan
 from src.config.config_manager import Config
 from src.log import get_api_logger
@@ -100,7 +101,8 @@ def create_app(config: BaseModel, transport: str):
     # --- App metadata ---
     app_config = getattr(config, 'app', None)
     app_name = getattr(app_config, 'name', 'AnyDoc')
-    app_version = getattr(app_config, 'version', '0.0.0')
+    # Always pyproject.toml's version (src/version.py); config's app.version is ignored.
+    app_version = get_version()
     app_title = getattr(app_config, 'title', 'AnyDoc')
     app_description = getattr(app_config, 'description', '')
     instructions = _load_instructions()

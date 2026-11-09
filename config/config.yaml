@@ -40,7 +40,6 @@ logging:
 
 app:
   name: "AnyDoc"
-  version: "1.0.0"
   title: "AnyDoc"
   description: "Document conversion MCP server: Office, PDF, Markdown, HTML, spreadsheets, presentations and images, plus PDF split / extract / rotate / encrypt."
 
