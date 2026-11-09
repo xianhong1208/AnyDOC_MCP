@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-11-09
+
 ### Fixed
 - AnyDoc reported **1.0.0** in `/openapi.json`, the landing page and MCP serverInfo after the 1.1.0 release: the version came from `app.version` in `config/config.yaml`, which the release did not bump. The version is now read from `pyproject.toml` (`src/version.py`), the one place it is written; `app.version` in a config is ignored.
 
@@ -30,6 +32,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 First release: a document conversion MCP server (Office ↔ PDF, Markdown ↔ Word, spreadsheets, presentations, images, OCR, PDF split / extract / rotate / encrypt) secured by MCP Gate OAuth 2.1.
 
-[Unreleased]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.0...dev
+[Unreleased]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.1...dev
+[1.1.1]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.1.0
 [1.0.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.0.0
