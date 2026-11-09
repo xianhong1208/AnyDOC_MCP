@@ -183,6 +183,8 @@ uv run python scripts/mcp_smoke.py         # protocol check with a real MCP clie
 
 The three layers answer different questions — is the logic right, do the engines actually produce valid files, can a client really use the tools — and each has caught bugs the others cannot.
 
+CI (`.github/workflows/ci.yml`) runs all three on every push and pull request to `dev` and `main`: ruff and pytest on the runner, then it builds the Docker image and runs `sweep_routes.py --strict` (a skipped route fails too) and `mcp_smoke.py` inside the container, so the engines and fonts checked are the ones that ship.
+
 ## Known limits
 
 - One file per call (no `pdf_merge` tool yet; the merge logic exists in `pdfops`).

@@ -183,6 +183,8 @@ uv run python scripts/mcp_smoke.py         # protocol check with a real MCP clie
 
 三層各自回答不同的問題 —— 邏輯對不對、引擎是否真的產出有效檔案、client 是否真的能使用這些工具 —— 而每一層都抓到過其他層抓不到的 bug。
 
+CI(`.github/workflows/ci.yml`)在每次 push 與對 `dev`、`main` 的 pull request 時跑這三層:先在 runner 上跑 ruff 與 pytest,再 build Docker image,並在容器內跑 `sweep_routes.py --strict`(被跳過的路線也算失敗)與 `mcp_smoke.py`,所以檢查到的引擎與字型就是實際出貨的那一套。
+
 ## 已知限制
 
 - 一次呼叫只處理一個檔案（尚無 `pdf_merge` 工具；合併邏輯已在 `pdfops` 中實作）。
