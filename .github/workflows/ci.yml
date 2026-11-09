@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.9.24"
+
+jobs:
+  test:
+    name: Lint and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --locked
+      - run: uv run --no-sync ruff check .
+      # The runner has no conversion engines; tests that need one skip. The image
+      # job below runs the real engines.
+      - run: uv run --no-sync python -m pytest -q
+
+  image:
+    name: Docker image (every route with real engines, MCP smoke test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build the image
+        run: docker build -t anydoc:ci .
+      - name: Start it (no auth, port 5056, as scripts/mcp_smoke.py expects)
+        run: |
+          docker run -d --name anydoc -p 5056:5056 \
+            -e AUTH_ENABLED=false -e SERVER_PORT=5056 -e ANYDOC_REVOCATION_ENABLED=false \
+            anydoc:ci
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:5056/health > /dev/null && break; sleep 2; done
+          curl -sf http://127.0.0.1:5056/health
+      - name: The container starts without installing anything
+        run: |
+          if docker logs anydoc 2>&1 | grep -E "Installed [0-9]+ package|Downloading "; then
+            echo "uv synced at container start"; exit 1
+          fi
+      - name: Every conversion route, with the image's engines and fonts
+        run: docker exec anydoc uv run --no-sync python scripts/sweep_routes.py --strict
+      - name: MCP protocol smoke test
+        run: docker exec anydoc uv run --no-sync python scripts/mcp_smoke.py
+      - name: Server log
+        if: always()
+        run: docker logs anydoc 2>&1 | tail -200
