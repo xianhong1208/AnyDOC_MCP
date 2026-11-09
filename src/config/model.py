@@ -89,7 +89,9 @@ class ConvertConfig(BaseModel):
 class AppConfig(BaseModel):
     """Application metadata."""
     name: str = "MyMCP"
-    version: str = "0.0.0"
+    # Ignored: the reported version comes from pyproject.toml (src/version.py).
+    # Kept so an older config that still sets it loads without error.
+    version: str | None = None
     title: str = "My MCP Service"
     description: str = ""
 

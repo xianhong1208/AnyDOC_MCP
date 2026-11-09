@@ -6,6 +6,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- AnyDoc reported **1.0.0** in `/openapi.json`, the landing page and MCP serverInfo after the 1.1.0 release: the version came from `app.version` in `config/config.yaml`, which the release did not bump. The version is now read from `pyproject.toml` (`src/version.py`), the one place it is written; `app.version` in a config is ignored.
+
 ## [1.1.0] — 2026-11-05
 
 ### Added

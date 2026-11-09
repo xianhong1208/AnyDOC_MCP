@@ -78,4 +78,7 @@ class TestLandingPage:
         body = self._client().get("/").text
         assert "Test MCP Service" in body
         assert 'href="/docs"' in body
-        assert "v9.9.9" in body
+        # The version shown is pyproject.toml's, not the config's 9.9.9 (src/version.py).
+        from src.version import get_version
+
+        assert f"v{get_version()}" in body and "9.9.9" not in body
