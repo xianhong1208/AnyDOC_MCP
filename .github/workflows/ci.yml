@@ -15,6 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Use the interpreter setup-python provides; never download one (see the setup-python steps).
+  UV_PYTHON_DOWNLOADS: never
   UV_VERSION: "0.9.24"
 
 jobs:
@@ -29,6 +31,11 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: ${{ env.UV_VERSION }}
+      # Python from the runner's tool cache: uv's own CPython download from GitHub releases
+      # fails with 504 on hosted runners often enough to turn CI red on its own.
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
       - run: uv sync --locked
       - run: uv run --no-sync ruff check .
       # The runner has no conversion engines; tests that need one skip. The image
