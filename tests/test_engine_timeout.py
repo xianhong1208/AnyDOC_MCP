@@ -58,7 +58,7 @@ async def test_engine_passes_the_configured_timeout(monkeypatch, module, cls, de
     eng_cls = getattr(importlib.import_module(module), cls)
     seen = {}
 
-    async def fake_run(self, argv, cwd, src, dst, timeout=None):
+    async def fake_run(self, argv, cwd, src, dst, timeout=None, **_):
         seen["timeout"] = timeout
         raise RuntimeError("stop after the command is built")
 
