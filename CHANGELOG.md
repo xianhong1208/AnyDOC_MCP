@@ -6,6 +6,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- LibreOffice conversions read files and fetched URLs a document linked to: an HTML `<img src="/usr/share/…">` or a DOCX image linked to `file:///…` came back embedded in the PDF, and an `<img>` or stylesheet naming `http://…` made AnyDoc request it (anything the server can reach). Every LibreOffice conversion now runs with a profile that blocks links from untrusted documents (`BlockUntrustedRefererLinks`), sends HTTP, HTTPS and FTP to an unreachable proxy (`proxy.invalid`, also set as `*_proxy` in soffice's environment) and never runs macros or updates links. Calc and Impress still loaded ODF images linked by path, and the RTF importer still read `INCLUDEPICTURE` files, despite the block, so documents are also stripped of outside references before LibreOffice opens them: external relationships in OOXML packages, `xlink:href`s (and `xml:base`, `form:image-data`) that do not point into the package in ODF, and linking fields (`INCLUDEPICTURE`, `INCLUDETEXT`, `IMPORT`, `LINK`, `DDE`, …) in RTF, whose stored result is shown instead. This goes by content, not by the declared format, because LibreOffice detects the type itself. Hyperlinks and images stored in the document are kept. A zip-based document that cannot be read far enough to check it (broken zip, malformed XML, an XML entity declaration) is now refused with a conversion error rather than passed on. Images linked by path or URL are no longer embedded; the same call as Pandoc's in 1.2.0.
+
 ## [1.2.0] — 2026-11-09
 
 ### Added

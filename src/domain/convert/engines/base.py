@@ -94,6 +94,7 @@ class CliEngine(ConversionEngine):
         src: str,
         dst: str,
         timeout: int = DEFAULT_TIMEOUT_SEC,
+        env: dict[str, str] | None = None,
     ) -> None:
         """Run the CLI in cwd; raise ConversionFailedError on failure
 
@@ -106,6 +107,7 @@ class CliEngine(ConversionEngine):
             proc = await asyncio.create_subprocess_exec(
                 *argv,
                 cwd=str(cwd),
+                env=env,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
