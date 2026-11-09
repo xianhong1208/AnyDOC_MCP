@@ -17,6 +17,10 @@ from src.domain.convert.engines.discovery import (
     find_binary,
     path_to_file_url,
 )
+from src.domain.convert.engines.external_refs import (
+    UncheckableDocumentError,
+    strip_external_references,
+)
 from src.domain.convert.types import ConversionFailedError
 from src.log import get_mcptools_logger
 
@@ -48,6 +52,69 @@ _CONVERT_TO = {
 # profile, and this lock keeps the profile directory names from colliding.
 _profile_counter = 0
 _profile_lock = asyncio.Lock()
+
+
+# Documents are untrusted, and LibreOffice loads what they link to while opening
+# them: an image linked by path or URL was read from the server's disk or fetched
+# over the network (anything the service can reach) and embedded in the output.
+# Every conversion runs with a profile that stops it:
+#
+#   BlockUntrustedRefererLinks  links from documents outside a trusted location
+#                               (none is configured) are not loaded
+#   ooInet*Proxy*               every HTTP, HTTPS and FTP request goes to a proxy
+#                               host that cannot exist (.invalid, RFC 6761), so
+#                               nothing is fetched even where the block does not
+#                               apply; the *_proxy variables do the same for
+#                               anything that reads the environment
+#   Update/Link                 links are never updated on load
+#   macros                      never run
+#
+# The ODF importers of Calc and Impress and the RTF importer still read local
+# files despite the block, so the document is also stripped of outside
+# references first (external_refs.py).
+_UNREACHABLE_PROXY = "proxy.invalid"
+_PROFILE_SETTINGS = """<?xml version="1.0" encoding="UTF-8"?>
+<oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema" \
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<item oor:path="/org.openoffice.Office.Common/Security/Scripting">\
+<prop oor:name="BlockUntrustedRefererLinks" oor:op="fuse"><value>true</value></prop></item>
+<item oor:path="/org.openoffice.Office.Common/Security/Scripting">\
+<prop oor:name="DisableMacrosExecution" oor:op="fuse"><value>true</value></prop></item>
+<item oor:path="/org.openoffice.Office.Common/Security/Scripting">\
+<prop oor:name="MacroSecurityLevel" oor:op="fuse"><value>3</value></prop></item>
+<item oor:path="/org.openoffice.Office.Writer/Content/Update">\
+<prop oor:name="Link" oor:op="fuse"><value>0</value></prop></item>
+<item oor:path="/org.openoffice.Office.Calc/Content/Update">\
+<prop oor:name="Link" oor:op="fuse"><value>1</value></prop></item>
+<item oor:path="/org.openoffice.Inet/Settings"><prop oor:name="ooInetProxyType" oor:op="fuse"><value>2</value></prop></item>
+<item oor:path="/org.openoffice.Inet/Settings"><prop oor:name="ooInetNoProxy" oor:op="fuse"><value></value></prop></item>
+""" + "".join(
+    f'''<item oor:path="/org.openoffice.Inet/Settings">\
+<prop oor:name="ooInet{scheme}ProxyName" oor:op="fuse"><value>{_UNREACHABLE_PROXY}</value></prop></item>
+<item oor:path="/org.openoffice.Inet/Settings">\
+<prop oor:name="ooInet{scheme}ProxyPort" oor:op="fuse"><value>9</value></prop></item>
+'''
+    for scheme in ("HTTP", "HTTPS", "FTP")
+) + "</oor:items>\n"
+
+_PROXY_ENV = {
+    name: f"http://{_UNREACHABLE_PROXY}:9"
+    for name in ("http_proxy", "https_proxy", "ftp_proxy", "all_proxy",
+                 "HTTP_PROXY", "HTTPS_PROXY", "FTP_PROXY", "ALL_PROXY")
+}
+
+
+def _write_profile_settings(profile: Path) -> None:
+    """Put the hardened settings into the (new) profile before soffice first starts with it."""
+    user_dir = profile / "user"
+    user_dir.mkdir(parents=True, exist_ok=True)
+    (user_dir / "registrymodifications.xcu").write_text(_PROFILE_SETTINGS, encoding="utf-8")
+
+
+def _soffice_env() -> dict[str, str]:
+    env = {key: value for key, value in os.environ.items() if key.lower() != "no_proxy"}
+    env.update(_PROXY_ENV)
+    return env
 
 
 # Format -> required LibreOffice component. Debian splits writer/calc/impress
@@ -101,15 +168,12 @@ class LibreOfficeEngine(CliEngine):
         }
         return all(self.has_component(c) for c in needed if c)
 
-    async def _next_profile_url(self) -> str:
+    async def _next_profile_dir(self) -> Path:
         global _profile_counter
         async with _profile_lock:
             _profile_counter += 1
             n = _profile_counter
-        path = Path(tempfile.gettempdir()) / f"lo_profile_{os.getpid()}_{n}"
-        # -env:UserInstallation needs a valid file:// URL on Windows too; see
-        # path_to_file_url for why string concatenation does not do it.
-        return path_to_file_url(path)
+        return Path(tempfile.gettempdir()) / f"lo_profile_{os.getpid()}_{n}"
 
     async def convert(self, data: bytes, src: str, dst: str, **opts) -> bytes:
         target = _CONVERT_TO.get(dst)
@@ -119,7 +183,20 @@ class LibreOfficeEngine(CliEngine):
             )
 
         timeout = base.resolve_timeout(opts, 180)
-        profile_url = await self._next_profile_url()
+        try:
+            # Off the event loop: a large spreadsheet's XML takes seconds to parse.
+            data = await asyncio.to_thread(strip_external_references, data)
+        except UncheckableDocumentError as e:
+            raise ConversionFailedError(
+                self.name, src, dst,
+                f"the document could not be checked for links to outside files ({e}); "
+                f"it is corrupt or not really a .{src} file",
+            ) from e
+        profile = await self._next_profile_dir()
+        _write_profile_settings(profile)
+        # -env:UserInstallation needs a valid file:// URL on Windows too; see
+        # path_to_file_url for why string concatenation does not do it.
+        profile_url = path_to_file_url(profile)
 
         with Workspace() as ws:
             ws.write(f"input.{src}", data)
@@ -134,7 +211,8 @@ class LibreOfficeEngine(CliEngine):
                 "--outdir", str(ws.path),
                 f"input.{src}",
             ]
-            await self._run_command(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout)
+            await self._run_command(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout,
+                                    env=_soffice_env())
 
             # soffice does not accept a custom output name; pick it up by extension
             try:

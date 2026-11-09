@@ -192,6 +192,7 @@ CI(`.github/workflows/ci.yml`)在每次 push 與對 `dev`、`main` 的 pull requ
 - PDF → 可編輯格式一定有損；PDF 內的表格以啟發式方式還原。
 - 圖片會保留，但附加在抽取出的 Markdown 末尾，而非原本的位置。
 - 不支援 `.xlsb`。
+- LibreOffice 轉檔同樣不會讀取文件所連結的檔案或網址：以路徑或網址連結的圖片（HTML 的 `<img>`、DOCX/XLSX/PPTX 中標為 external 的 relationship、ODF 的 `xlink:href`、RTF 的 `INCLUDEPICTURE` 欄位）不會出現在輸出中，樣式表也不會被下載。每次轉檔都使用一個會封鎖不受信任文件連結、並把所有 HTTP/HTTPS/FTP 流量導向不存在之 proxy 的 LibreOffice 設定檔；ODF、OOXML 與 RTF 文件還會先移除指向外部的參照（依內容判斷，所以改名成 `.pptx` 的 ODP 仍當作 ODP 處理）。文件內嵌的圖片會保留。無法完整讀取以進行檢查的 zip 類文件會被拒絕，而不是照樣轉檔。
 - Pandoc 轉檔不會讀取文件所指向的檔案或網址：LaTeX 的 `\input` / `\lstinputlisting` / `\includegraphics`，以及用路徑或 `http(s)` 網址引用的圖片都會被略過（圖片保留 alt 文字）；文件內嵌或以 `data:` URI 提供的圖片會保留。
 - 撤銷不是即時的：啟用 [revocation feed](#token-撤銷) 時，被撤銷的 token 會在一個輪詢間隔內失效（預設 30 秒）；未啟用時則要等到過期。
 

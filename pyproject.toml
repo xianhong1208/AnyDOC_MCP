@@ -1,6 +1,6 @@
 [project]
 name = "anydoc"
-version = "1.2.0"
+version = "1.2.1"
 description = "AnyDoc - document conversion MCP server (Office, PDF, Markdown, images, OCR) protected by MCP Gate OAuth 2.1"
 readme = "README.md"
 license = { text = "MIT" }

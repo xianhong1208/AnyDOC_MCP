@@ -193,6 +193,7 @@ CI (`.github/workflows/ci.yml`) runs all three on every push and pull request to
 - Images are kept but appended at the end of extracted Markdown, not at their original position.
 - `.xlsb` is not supported.
 - Pandoc conversions never read files or URLs a document points at: LaTeX `\input` / `\lstinputlisting` / `\includegraphics` and images given as a path or `http(s)` URL are dropped (an image keeps its alt text); images embedded in the document or given as `data:` URIs are kept.
+- LibreOffice conversions never read files or URLs a document links to either: an image linked by path or URL (an HTML `<img>`, a DOCX/XLSX/PPTX relationship marked external, an ODF `xlink:href`, an RTF `INCLUDEPICTURE` field) is left out of the output, and stylesheets are not fetched. Every conversion runs with a LibreOffice profile that blocks links from untrusted documents and sends all HTTP/HTTPS/FTP traffic to a proxy that cannot exist, and ODF, OOXML and RTF documents are stripped of outside references first (by content, so an ODP renamed to `.pptx` is treated as ODP). Images stored inside the document are kept. A zip-based document that cannot be read far enough to check it is refused instead of converted.
 - Revocation is not instant: with the [revocation feed](#token-revocation) a revoked token stops working within one poll interval (30 s by default); without it, at expiry.
 
 ## Contributing
