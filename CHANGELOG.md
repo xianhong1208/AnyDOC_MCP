@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-11-09
+
 ### Added
 - **Continuous integration** (`.github/workflows/ci.yml`): ruff and pytest on every push and pull request to `dev` and `main`, and a job that builds the Docker image, starts it, and runs `scripts/sweep_routes.py --strict` and `scripts/mcp_smoke.py` inside the container against the engines and fonts that ship.
 
@@ -42,7 +44,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 First release: a document conversion MCP server (Office ↔ PDF, Markdown ↔ Word, spreadsheets, presentations, images, OCR, PDF split / extract / rotate / encrypt) secured by MCP Gate OAuth 2.1.
 
-[Unreleased]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.1...dev
+[Unreleased]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.2.0...dev
+[1.2.0]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.1.0
 [1.0.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.0.0
