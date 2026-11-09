@@ -190,6 +190,7 @@ The three layers answer different questions — is the logic right, do the engin
 - PDF → editable formats is always lossy; tables inside PDFs are recovered heuristically.
 - Images are kept but appended at the end of extracted Markdown, not at their original position.
 - `.xlsb` is not supported.
+- Pandoc conversions never read files or URLs a document points at: LaTeX `\input` / `\lstinputlisting` / `\includegraphics` and images given as a path or `http(s)` URL are dropped (an image keeps its alt text); images embedded in the document or given as `data:` URIs are kept.
 - Revocation is not instant: with the [revocation feed](#token-revocation) a revoked token stops working within one poll interval (30 s by default); without it, at expiry.
 
 ## Contributing
