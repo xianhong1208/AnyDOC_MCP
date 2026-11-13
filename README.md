@@ -1,12 +1,53 @@
 # Morphyard
 
-**A document conversion MCP server.** Upload a file, get it back in the format you need: Office ↔ PDF, Markdown ↔ Word, spreadsheets, presentations, images, OCR of scanned pages, and PDF split / extract / rotate / encrypt — all exposed as MCP tools that any MCP-capable client (Claude Code, Claude Desktop, Cursor, FastMCP clients) can call.
+[![License: MIT](https://img.shields.io/github/license/xianhong1208/morphyard)](LICENSE)
+[![CI](https://github.com/xianhong1208/morphyard/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/xianhong1208/morphyard/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/xianhong1208/morphyard)](https://github.com/xianhong1208/morphyard/releases/latest)
 
-Authentication is delegated to [MCP Gate](https://github.com/xianhong1208/MCP_Gate): Morphyard is an OAuth 2.1 resource server that verifies MCP Gate's RS256 tokens offline through its JWKS. It never stores users or issues tokens itself.
+**A document-conversion MCP server: hand it a file, get it back in the format you need — Office ↔ PDF, Markdown ↔ Word, spreadsheets, presentations, images, OCR and PDF page tools — from any MCP client.**
 
-[繁體中文](README.zh-TW.md) · [Quick start](#quick-start) · [Tools](#tools) · [How it works](#how-it-works) · [Configuration](#configuration) · [Architecture](docs/architecture.md)
+Formerly AnyDoc; see [renamed variables](docs/configuration.md#renamed-variables) if you are upgrading.
 
-> **Formerly AnyDoc.** Renamed in 1.2.2; the old variable names are no longer read: `ANYDOC_BASE_URL` → `MORPHYARD_BASE_URL`, `ANYDOC_REVOCATION_ENABLED` → `MORPHYARD_REVOCATION_ENABLED`, `ANYDOC_REVOCATION_CLIENT_ID` → `MORPHYARD_REVOCATION_CLIENT_ID`, `ANYDOC_REVOCATION_CLIENT_SECRET` → `MORPHYARD_REVOCATION_CLIENT_SECRET`, `ANYDOC_REVOCATION_POLL_INTERVAL` → `MORPHYARD_REVOCATION_POLL_INTERVAL`, `ANYDOC_REVOCATION_FAIL_MODE` → `MORPHYARD_REVOCATION_FAIL_MODE`.
+[繁體中文](README.zh-TW.md) · [Tools and formats](docs/tools.md) · [Configuration](docs/configuration.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
+
+Morphyard exposes its conversions as MCP tools that any MCP-capable client (Claude Code, Claude Desktop, Cursor, FastMCP clients) can call. Authentication is delegated to [MCP Gate](https://github.com/xianhong1208/MCP_Gate): Morphyard is an OAuth 2.1 resource server that verifies MCP Gate's RS256 tokens offline through its JWKS. It never stores users or issues tokens itself.
+
+## What a call looks like
+
+A Word file goes in as base64; a PDF comes back as an MCP embedded resource, with a summary the model can relay. From a real run against a local server (FastMCP client):
+
+```python
+await client.call_tool("convert_document", {
+    "file_content": "<base64 of report.docx>",
+    "file_name": "report.docx",
+    "target_format": "pdf",
+    "output_name": "report",
+})
+```
+
+```text
+TEXT  Conversion complete: report.pdf
+      Path: docx → pdf (engines: libreoffice)
+      Size: 23.4 KB
+FILE  file:///report.pdf  application/pdf  23963 bytes
+```
+
+And `extract_text` on the same file returns Markdown for the model to read:
+
+```markdown
+# Quarterly report
+
+| Region | Sales |
+|--------|-------|
+| North  | 120   |
+| South  | 95    |
+
+- North leads this quarter
+```
+
+## What's new
+
+**1.2.1** (2026-11-09): LibreOffice conversions can no longer read local files or fetch URLs a document links to, and never run macros — the same guarantee Pandoc conversions got in 1.2.0, which also added CI that runs every advertised conversion inside the Docker image. See the [CHANGELOG](CHANGELOG.md), and the [Roadmap](ROADMAP.md) for what comes next.
 
 ## Key features
 
@@ -14,10 +55,13 @@ Authentication is delegated to [MCP Gate](https://github.com/xianhong1208/MCP_Ga
 - **Six engines, chosen by fidelity.** LibreOffice for layout-faithful Office ↔ PDF, Pandoc for structure-preserving text formats, [firecrawl-anydoc](https://pypi.org/project/firecrawl-anydoc/) for fast document → Markdown extraction, Tesseract for OCR, Pillow for images, and a thin text engine for JSON / XML / TSV. A missing engine disables its paths at startup instead of failing at request time.
 - **Multi-hop planning that says what it costs.** When no engine converts A → B directly, the registry searches up to three hops, ranked by fidelity. Lossy hops are allowed by default but flagged in the result so the model can tell the user; pass `allow_quality_loss=false` to refuse any path that would lose layout.
 - **Format detection without a file name.** Extension → MIME → container inspection (ZIP directory / OLE2 streams) → magic bytes. Sixteen formats are recognised with no name and no MIME type at all.
-- **Standards-based auth.** Bearer tokens are verified against MCP Gate's JWKS (issuer, audience, optional scopes); the server publishes `/.well-known/oauth-protected-resource/mcp` so OAuth-aware clients discover where to sign in.
+- **Documents cannot reach out.** Conversions never read local files or fetch URLs a document points at, and LibreOffice never runs macros.
+- **Standards-based auth.** Bearer tokens are verified against MCP Gate's JWKS (issuer, audience, optional scopes); the server publishes `/.well-known/oauth-protected-resource/mcp` so OAuth-aware clients discover where to sign in. With the optional revocation feed, a token revoked in MCP Gate stops working here within one poll interval (30 s by default).
 - **Runs anywhere.** One Docker image with all engines baked in, or a plain `uv run`.
 
-## Install
+Supported: pdf, docx, doc, odt, rtf, epub; xlsx, xls, ods, csv, tsv; pptx, ppt, odp; md, html, txt, rst, tex, json, xml; png, jpg, webp, gif, bmp, tiff. The full tool and format tables are in [docs/tools.md](docs/tools.md).
+
+## Installation
 
 **Prerequisites:** Python 3.13+ and [uv](https://docs.astral.sh/uv/). The Python engines (`firecrawl-anydoc`, `pypdf`, `pillow`) install with `uv sync`; the others are system packages:
 
@@ -34,13 +78,6 @@ sudo apt-get install -y libreoffice-writer libreoffice-calc libreoffice-impress 
 git clone https://github.com/xianhong1208/morphyard.git
 cd morphyard
 uv sync
-```
-
-Or skip the system packages entirely and use the container, which ships every engine:
-
-```bash
-docker build -t morphyard .
-docker run -p 5055:5055 -e MCP_GATE_URL=http://mcp-gate:4568 morphyard
 ```
 
 ## Quick start
@@ -71,6 +108,8 @@ claude mcp add --transport http morphyard http://localhost:5055/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
+Then ask your assistant to convert a file, e.g. "turn this DOCX into a PDF".
+
 ### 4. Verify
 
 ```bash
@@ -79,129 +118,42 @@ curl -s http://localhost:5055/.well-known/oauth-authorization-server      # MCP 
 curl -i -X POST http://localhost:5055/mcp                                  # 401 without a token
 ```
 
-For a local experiment without MCP Gate, run with `config/config.test.yaml` (authentication off) and the protocol smoke test:
+For a local experiment without MCP Gate, start it with authentication off and run the protocol smoke test:
 
 ```bash
-SERVER_PORT=5056 uv run python main.py --config config/config.test.yaml
+AUTH_ENABLED=false SERVER_PORT=5056 MORPHYARD_REVOCATION_ENABLED=false uv run python main.py
 uv run python scripts/mcp_smoke.py
 ```
 
-## Tools
+## Deployment options
 
-| Tool | Purpose | Returns |
-|---|---|---|
-| `convert_document` | Convert to a target format | File |
-| `extract_text` | Extract content as Markdown for the model to read | Text |
-| `inspect_document` | Format, size, page count and reachable targets | Text |
-| `list_supported_conversions` | Capability matrix (only engines that are installed) | Text |
-| `pdf_extract_pages` | Pick or reorder pages | File |
-| `pdf_split` | Split into several files | Files |
-| `pdf_rotate` | Rotate selected pages | File |
-| `pdf_protect` | AES-256 encryption | File |
+- **Docker** — skip the system packages; the image ships every engine and font:
 
-**Supported formats**
+  ```bash
+  docker build -t morphyard .
+  docker run -p 5055:5055 -e MCP_GATE_URL=http://mcp-gate:4568 \
+    -e MORPHYARD_BASE_URL=http://127.0.0.1:5055 morphyard
+  ```
 
-| Category | Formats |
+- **Directly on the host** with `uv run python main.py`, as in the quick start.
+
+Either way, `MORPHYARD_BASE_URL` must be the address clients use, because the token audience is derived from it. Every setting, and how to turn on the revocation feed, is in [docs/configuration.md](docs/configuration.md).
+
+## Documentation
+
+| Document | What is in it |
 |---|---|
-| Documents | pdf, docx, doc, odt, rtf, epub |
-| Spreadsheets | xlsx, xls, ods, csv, tsv |
-| Presentations | pptx, ppt, odp |
-| Text | md, html, txt, rst, tex, json, xml |
-| Images | png, jpg, webp, gif, bmp, tiff |
-
-Not supported: audio, video, archives, CAD, executables. The tool descriptions and [`config/instructions.md`](config/instructions.md) tell the model to say so instead of retrying.
-
-## How it works
-
-```
-client ──(bearer token)──▶ /mcp ──▶ tools ──▶ service.py ──▶ registry.plan_conversion() ──▶ engines
-                             │
-                             └── JWTVerifier(jwks_uri = MCP_GATE_URL/.well-known/jwks.json)
-```
-
-1. **Input.** Tools receive `file_content` (base64), `file_name` and `mime_type`. Hosts that manage uploads usually inject the base64 automatically; the parameter descriptions are written so the model puts the upload reference in `file_content` and nothing else.
-2. **Detection.** `detect_format()` tries the extension, then MIME, then looks inside the container, then magic bytes — because in practice the file name is often missing.
-3. **Planning.** `plan_conversion()` finds a direct engine or a path of up to three hops, ranked by fidelity, hop count and intermediate-format preference. Direct paths are never refused. Multi-hop paths that drop below `structural` fidelity are executed with a warning attached; with `allow_quality_loss=false` they are refused instead.
-4. **Execution.** Engines run as subprocesses inside a temporary workspace with a timeout; scanned PDFs fall back from text extraction to OCR automatically.
-5. **Output.** Tools return `[summary text, File(...)]`; the file arrives as an MCP `EmbeddedResource`.
-
-| Term | Meaning |
-|---|---|
-| **Fidelity** | `high` (layout preserved), `structural` (headings / lists / tables preserved), `lossy` (text only). Drives path planning. |
-| **Hop** | One engine invocation in a multi-step path. |
-| **Audience** | The resource URI in the token; must equal what MCP Gate registered for this server. |
-
-The engine table, the planner's rules and the format-detection details are in [docs/architecture.md](docs/architecture.md).
-
-## Configuration
-
-Everything is in [`config/config.yaml`](config/config.yaml) and reads environment variables with `${VAR:-default}`. [`.env.example`](.env.example) lists them:
-
-| Variable | Default | Description |
-|---|---|---|
-| `SERVER_HOST` / `SERVER_PORT` | `0.0.0.0` / `5055` | Bind address. |
-| `MCP_GATE_URL` | `http://localhost:4568` | The MCP Gate that issues tokens (`auth.issuer`). The pre-rename `MCP_CENTER_URL` is still read when this is unset. |
-| `MORPHYARD_BASE_URL` | `http://127.0.0.1:5055` | The address this server is reached at. The token audience is `<MORPHYARD_BASE_URL>/mcp` and must equal the service registered in MCP Gate; it also appears in the protected-resource metadata. |
-| `AUTH_ENABLED` | `true` | Set to `false` only for local experiments. |
-| `MAX_INPUT_MB` | `50` | Per-file limit; also raises the MCP transport body limit (×1.5). |
-| `ENGINE_TIMEOUT` | engine default | Seconds per engine call, applied to every engine. Unset keeps each engine's own limit: LibreOffice 180, Pandoc 120, OCR 300. |
-| `LOG_LEVEL` | `INFO` | |
-
-In the YAML, `auth.required_scopes` lets you demand a scope such as `mcp:tools:invoke` on every token, and `auth.audience` overrides the derived audience for the rare case where the registered resource URI is not `<base_url>/mcp`.
-
-### Token revocation
-
-Morphyard verifies MCP Gate tokens offline, so by default a token revoked in MCP Gate keeps working here until it expires — and a personal access token can live up to a year. Turn on the **revocation feed** and Morphyard polls MCP Gate's `POST /oauth/revoked` in the background (every `poll_interval_sec`, with jitter and error backoff), keeps the revoked-but-unexpired `jti`s in memory, and answers a listed token on `/mcp` with 401 `invalid_token`. A revocation takes effect within about one poll interval.
-
-| Variable / setting | Default | Description |
-|---|---|---|
-| `MORPHYARD_REVOCATION_ENABLED` (`auth.revocation.enabled`) | `false` | Turn the feed on. Off = nothing is polled. |
-| `MORPHYARD_REVOCATION_CLIENT_ID` | — | The resource-server client registered in MCP Gate (below). |
-| `MORPHYARD_REVOCATION_CLIENT_SECRET` | — | Its secret. In the YAML it **must** stay an `${ENV_VAR}` reference; a literal value refuses to start. |
-| `MORPHYARD_REVOCATION_POLL_INTERVAL` (`poll_interval_sec`) | `30` | Seconds between polls (5–3600). |
-| `MORPHYARD_REVOCATION_FAIL_MODE` (`fail_mode`) | `open` | When MCP Gate is unreachable: `open` keeps accepting tokens and logs loudly; `closed` rejects every token once no poll has succeeded for `stale_after_intervals` × `poll_interval_sec` (YAML, default 4), and until the first poll after startup succeeds. |
-
-The first poll fetches the whole list; later polls ask only for revocations since the previous one (with a 30 s overlap), and a full fetch repeats every hour. Entries are dropped once the token would have expired anyway. Startup logs whether the feed is enabled, and `GET /health` reports it under `revocation` (`last_success`, `revoked_count`, `consecutive_failures`, `last_error`, `stale`); a stale feed turns `status` into `degraded`.
-
-**Setting it up** (once per deployment):
-
-1. **Register a confidential client in MCP Gate.** Console → *OAuth Clients* → *Register trusted client*. Name it e.g. `Morphyard revocation feed`; leave *Redirect URIs* empty; under *Grant types* select only `client_credentials`; *Token endpoint authentication*: **Client secret (POST body)** (HTTP Basic works too — MCP Gate accepts either); *Resource server for*: **Morphyard**. Register, then copy the `client_id` (`mcpc_…`) and the client secret — the secret is shown once.
-2. **Bind it to Morphyard** — already done if you picked *Resource server for* in step 1. Otherwise, on the client's row click the server icon (*Resource server…*), choose the Morphyard service and *Save*; or call `PUT /api/oauth/clients/<client_id>/resource-server` with `{"service_id": "<Morphyard service id>"}` as a console admin. The row then reads *Resource server for Morphyard*. The feed lists only tokens whose audience is that service's audience, so it must equal `<MORPHYARD_BASE_URL>/mcp`.
-3. **Give Morphyard the credentials** in its environment (or `.env`), then restart:
-   ```bash
-   MORPHYARD_REVOCATION_ENABLED=true
-   MORPHYARD_REVOCATION_CLIENT_ID=mcpc_...
-   MORPHYARD_REVOCATION_CLIENT_SECRET=...
-   ```
-4. **Check it.** The startup log says `MCP Gate revocation feed: ENABLED …`; `curl -s localhost:5055/health` shows a recent `revocation.last_success`. Revoke a test token in MCP Gate; within `poll_interval_sec` a call to `/mcp` with it gets 401. `HTTP 401: invalid_client` in `last_error` means wrong credentials; `HTTP 403: unauthorized_client` means the client is not bound to a server.
-
-## Testing
-
-```bash
-uv run pytest                              # logic, < 1 s, engines are mocked
-uv run python scripts/sweep_routes.py      # every advertised path against real engines, ~70 s
-uv run python scripts/mcp_smoke.py         # protocol check with a real MCP client (server on :5056)
-```
-
-The three layers answer different questions — is the logic right, do the engines actually produce valid files, can a client really use the tools — and each has caught bugs the others cannot.
-
-CI (`.github/workflows/ci.yml`) runs all three on every push and pull request to `dev` and `main`: ruff and pytest on the runner, then it builds the Docker image and runs `sweep_routes.py --strict` (a skipped route fails too) and `mcp_smoke.py` inside the container, so the engines and fonts checked are the ones that ship.
-
-## Known limits
-
-- One file per call (no `pdf_merge` tool yet; the merge logic exists in `pdfops`).
-- 50 MB per file, 30 pages per OCR run.
-- PDF → editable formats is always lossy; tables inside PDFs are recovered heuristically.
-- Images are kept but appended at the end of extracted Markdown, not at their original position.
-- `.xlsb` is not supported.
-- Pandoc conversions never read files or URLs a document points at: LaTeX `\input` / `\lstinputlisting` / `\includegraphics` and images given as a path or `http(s)` URL are dropped (an image keeps its alt text); images embedded in the document or given as `data:` URIs are kept.
-- LibreOffice conversions never read files or URLs a document links to either: an image linked by path or URL (an HTML `<img>`, a DOCX/XLSX/PPTX relationship marked external, an ODF `xlink:href`, an RTF `INCLUDEPICTURE` field) is left out of the output, and stylesheets are not fetched. Every conversion runs with a LibreOffice profile that blocks links from untrusted documents and sends all HTTP/HTTPS/FTP traffic to a proxy that cannot exist, and ODF, OOXML and RTF documents are stripped of outside references first (by content, so an ODP renamed to `.pptx` is treated as ODP). Images stored inside the document are kept. A zip-based document that cannot be read far enough to check it is refused instead of converted.
-- Revocation is not instant: with the [revocation feed](#token-revocation) a revoked token stops working within one poll interval (30 s by default); without it, at expiry.
+| [Tools and formats](docs/tools.md) | The eight tools, supported formats, how a conversion runs, known limits |
+| [Configuration](docs/configuration.md) | Environment variables and the MCP Gate revocation feed |
+| [Architecture](docs/architecture.md) | Module layout, engines and fidelity, format detection, conversion planning, test layers |
+| [Development](docs/development.md) | Setting up, the three test layers, CI, how to contribute |
+| [Roadmap](ROADMAP.md) | What shipped and what comes next |
+| [Changelog](CHANGELOG.md) | Every release |
 
 ## Contributing
 
-Bug reports and pull requests are welcome. Keep comments and docstrings in English, run `uv run ruff check .` and `uv run pytest` before opening a PR, and run `scripts/sweep_routes.py` after touching the registry or upgrading an engine.
+Bug reports and pull requests are welcome. Pull requests go into `dev`; run `uv run ruff check .` and `uv run pytest` first. See [docs/development.md](docs/development.md).
 
-## License
+## Licence
 
 [MIT](LICENSE)

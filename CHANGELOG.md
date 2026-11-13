@@ -6,6 +6,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Docs
+- Docs: roadmap and README rewritten. A new `ROADMAP.md` / `ROADMAP.zh-TW.md` lists what shipped and the plan to 1.8, with a GitHub milestone per version. Both READMEs follow a shorter layout (badges, an example tool call from a real run, quick start, deployment options); the tool and format tables, known limits, configuration (with the renamed variables) and revocation-feed setup, and testing moved to `docs/tools`, `docs/configuration` and `docs/development` (English and Traditional Chinese). The local-experiment command no longer points at a `config/config.test.yaml` that does not exist.
+
 ### Changed
 - Renamed from AnyDoc to Morphyard; environment variables are now `MORPHYARD_*` (the `ANYDOC_*` names are no longer read): `MORPHYARD_BASE_URL`, `MORPHYARD_REVOCATION_ENABLED`, `MORPHYARD_REVOCATION_CLIENT_ID`, `MORPHYARD_REVOCATION_CLIENT_SECRET`, `MORPHYARD_REVOCATION_POLL_INTERVAL`, `MORPHYARD_REVOCATION_FAIL_MODE`. The Python project is `morphyard`, MCP serverInfo reports `Morphyard`, and the config section and tool module are `morphyard` / `src.fastmcp_tools.morphyard_tools`. The document → Markdown engine is now reported as `firecrawl` (it was `anydoc`, after the firecrawl-anydoc library it wraps). Port 5055 and the token audience `<base_url>/mcp` are unchanged.
 

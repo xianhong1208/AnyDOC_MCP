@@ -22,7 +22,7 @@ auth:
   required_scopes: []
   # MCP Gate revocation feed: without it a token revoked in MCP Gate keeps working here
   # until it expires. Needs a confidential client bound to this server in MCP Gate
-  # (README -> "Token revocation"). The secret must stay an ${ENV_VAR} reference.
+  # (docs/configuration.md -> "Token revocation"). The secret must stay an ${ENV_VAR} reference.
   revocation:
     enabled: ${MORPHYARD_REVOCATION_ENABLED:-false}
     client_id: "${MORPHYARD_REVOCATION_CLIENT_ID:-}"
