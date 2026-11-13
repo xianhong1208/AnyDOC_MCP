@@ -62,6 +62,22 @@ def _apply_convert_config(config: BaseModel) -> None:
     )
 
 
+async def _sweep_stale_libreoffice_profiles() -> None:
+    """Remove LibreOffice profiles that earlier runs left in the temp directory.
+
+    Each conversion deletes its own profile; this catches what a crash, a kill -9 or a
+    version before 1.2.2 left behind. Never fatal: a failed sweep only means leftovers.
+    """
+    import asyncio
+
+    from src.domain.convert.engines.libreoffice import sweep_stale_profiles
+
+    try:
+        await asyncio.to_thread(sweep_stale_profiles)
+    except Exception as e:  # pragma: no cover - defensive
+        api_logger.warning(f"Could not sweep stale LibreOffice profiles: {e}")
+
+
 def _raise_mcp_body_limit(max_input_mb: int) -> None:
     """Raise the MCP streamable-HTTP request body limit.
 
@@ -130,6 +146,7 @@ def create_app(config: BaseModel, transport: str):
 
     @asynccontextmanager
     async def lifespan(app):
+        await _sweep_stale_libreoffice_profiles()
         async with mcp_app.lifespan(app):
             async with revocation_lifespan():
                 yield

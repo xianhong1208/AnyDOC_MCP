@@ -7,7 +7,11 @@ not layout), so every path that demands visual fidelity comes through here.
 
 import asyncio
 import os
+import shutil
+import signal
+import stat
 import tempfile
+import time
 from pathlib import Path
 
 from src.domain.convert.engines import base
@@ -48,10 +52,26 @@ _CONVERT_TO = {
 }
 
 # One LibreOffice user profile cannot be used by two processes at once; it
-# deadlocks outright. Under concurrent conversions each process gets its own
-# profile, and this lock keeps the profile directory names from colliding.
-_profile_counter = 0
-_profile_lock = asyncio.Lock()
+# deadlocks outright. So every conversion gets a profile of its own, a fresh
+# private directory (mkdtemp, mode 0700) named lo_profile_<pid>_<random>, and
+# deletes it when the conversion ends, however it ends. Profiles left by a
+# crashed or killed server are removed by sweep_stale_profiles() at startup.
+PROFILE_PREFIX = "lo_profile_"
+# A file in the profile that a conversion holds an exclusive flock on for as long
+# as it runs. The sweep never deletes a profile it cannot lock, so a profile in use
+# by another worker, or another server sharing the temp directory, is left alone.
+# The lock is released by the kernel when its holder dies, however it dies.
+_IN_USE_FILE = ".morphyard-in-use"
+# The sweep only deletes profiles untouched for longer than this. Every engine call
+# has a timeout (LibreOffice: 180 s by default), so a live profile is never this old;
+# the lock and the process check below protect it anyway.
+STALE_PROFILE_AGE_SEC = 3600
+_USER_INSTALLATION = "-env:UserInstallation="
+
+try:
+    import fcntl
+except ImportError:  # Windows: no flock; the age and process checks still apply
+    fcntl = None
 
 
 # Documents are untrusted, and LibreOffice loads what they link to while opening
@@ -111,10 +131,149 @@ def _write_profile_settings(profile: Path) -> None:
     (user_dir / "registrymodifications.xcu").write_text(_PROFILE_SETTINGS, encoding="utf-8")
 
 
-def _soffice_env() -> dict[str, str]:
+def _soffice_env(temp_dir: Path | None = None) -> dict[str, str]:
     env = {key: value for key, value in os.environ.items() if key.lower() != "no_proxy"}
     env.update(_PROXY_ENV)
+    if temp_dir is not None:
+        # soffice keeps its own temp files (lu<pid>….tmp) in TMPDIR and leaves them
+        # behind when it is killed; inside the profile they go when the profile goes.
+        env["TMPDIR"] = env["TMP"] = env["TEMP"] = str(temp_dir)
     return env
+
+
+class _Profile:
+    """A LibreOffice user profile for one conversion, removed when it ends."""
+
+    def __init__(self, root: Path | None = None):
+        root = Path(root or tempfile.gettempdir())
+        self.path = Path(tempfile.mkdtemp(prefix=f"{PROFILE_PREFIX}{os.getpid()}_", dir=root))
+        self._lock_fd: int | None = None
+        try:
+            self._lock_fd = os.open(self.path / _IN_USE_FILE, os.O_CREAT | os.O_RDWR, 0o600)
+            if fcntl is not None:
+                fcntl.flock(self._lock_fd, fcntl.LOCK_EX)
+            _write_profile_settings(self.path)
+            self.temp_dir = self.path / "tmp"
+            self.temp_dir.mkdir()
+        except BaseException:
+            self.discard()
+            raise
+        # -env:UserInstallation needs a valid file:// URL on Windows too; see
+        # path_to_file_url for why string concatenation does not do it.
+        self.url = path_to_file_url(self.path)
+
+    def discard(self) -> None:
+        """Make sure no soffice still runs with this profile, then delete it."""
+        if getattr(self, "url", None):
+            for pid in _pids_using_profile(self.url):
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+        shutil.rmtree(self.path, ignore_errors=True)
+        if self._lock_fd is not None:
+            os.close(self._lock_fd)
+            self._lock_fd = None
+
+
+def _profile_args_in_use() -> list[tuple[int, str]]:
+    """(pid, -env:UserInstallation value) of every running process started with one.
+
+    Linux only (/proc); elsewhere nothing is found and the lock and age checks remain.
+    """
+    found: list[tuple[int, str]] = []
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return found
+    own = os.getpid()
+    for entry in proc.iterdir():
+        if not entry.name.isdigit() or int(entry.name) == own:
+            continue
+        try:
+            args = (entry / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        for arg in args:
+            if arg.startswith(_USER_INSTALLATION.encode()):
+                found.append((int(entry.name),
+                              arg[len(_USER_INSTALLATION):].decode("utf-8", "replace")))
+    return found
+
+
+def _pids_using_profile(url: str) -> list[int]:
+    return [pid for pid, value in _profile_args_in_use() if value == url]
+
+
+def _newest_mtime(path: Path) -> float:
+    """The latest change to the profile directory or its user/ directory (where soffice writes)."""
+    newest = path.lstat().st_mtime
+    try:
+        newest = max(newest, (path / "user").lstat().st_mtime)
+    except OSError:
+        pass
+    return newest
+
+
+def _locked_by_someone(path: Path) -> bool:
+    """True when another open conversion holds the profile's in-use lock."""
+    if fcntl is None:
+        return False
+    try:
+        fd = os.open(path / _IN_USE_FILE, os.O_RDWR)
+    except OSError:
+        return False  # no lock file: a profile from before 1.2.2, or one being torn down
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return True
+    finally:
+        os.close(fd)  # closing releases the lock if we took it
+    return False
+
+
+def sweep_stale_profiles(root: Path | None = None,
+                         min_age_sec: float = STALE_PROFILE_AGE_SEC) -> int:
+    """Delete profiles left behind by earlier runs; returns how many were removed.
+
+    A profile is removed only when all of these hold:
+      - it is a real directory named lo_profile_* (a symlink is never followed);
+      - it belongs to the user this server runs as;
+      - nothing has changed in it for min_age_sec;
+      - no conversion holds its in-use lock;
+      - no running process was started with it as its LibreOffice profile.
+    So a profile of a conversion running in another worker, or another server sharing
+    the temp directory, is never touched.
+    """
+    root = Path(root or tempfile.gettempdir())
+    now = time.time()
+    uid = os.geteuid() if hasattr(os, "geteuid") else None
+    in_use = [value.rstrip("/") for _, value in _profile_args_in_use()]
+    removed = 0
+    try:
+        candidates = list(root.glob(f"{PROFILE_PREFIX}*"))
+    except OSError:
+        return 0
+    for path in candidates:
+        try:
+            st = path.lstat()
+            if not stat.S_ISDIR(st.st_mode):
+                continue
+            if uid is not None and st.st_uid != uid:
+                continue
+            if now - _newest_mtime(path) < min_age_sec:
+                continue
+        except OSError:
+            continue
+        if any(value.endswith("/" + path.name) for value in in_use):
+            continue
+        if _locked_by_someone(path):
+            continue
+        shutil.rmtree(path, ignore_errors=True)
+        if not path.exists():
+            removed += 1
+    if removed:
+        logger.info(f"[libreoffice] removed {removed} stale profile(s) from {root}")
+    return removed
 
 
 # Format -> required LibreOffice component. Debian splits writer/calc/impress
@@ -168,13 +327,6 @@ class LibreOfficeEngine(CliEngine):
         }
         return all(self.has_component(c) for c in needed if c)
 
-    async def _next_profile_dir(self) -> Path:
-        global _profile_counter
-        async with _profile_lock:
-            _profile_counter += 1
-            n = _profile_counter
-        return Path(tempfile.gettempdir()) / f"lo_profile_{os.getpid()}_{n}"
-
     async def convert(self, data: bytes, src: str, dst: str, **opts) -> bytes:
         target = _CONVERT_TO.get(dst)
         if not target:
@@ -192,38 +344,37 @@ class LibreOfficeEngine(CliEngine):
                 f"the document could not be checked for links to outside files ({e}); "
                 f"it is corrupt or not really a .{src} file",
             ) from e
-        profile = await self._next_profile_dir()
-        _write_profile_settings(profile)
-        # -env:UserInstallation needs a valid file:// URL on Windows too; see
-        # path_to_file_url for why string concatenation does not do it.
-        profile_url = path_to_file_url(profile)
+        profile = _Profile()
+        try:
+            with Workspace() as ws:
+                ws.write(f"input.{src}", data)
+                argv = [
+                    self.resolved_binary(),
+                    "--headless",
+                    "--norestore",
+                    "--nolockcheck",
+                    "--nodefault",
+                    f"{_USER_INSTALLATION}{profile.url}",
+                    "--convert-to", target,
+                    "--outdir", str(ws.path),
+                    f"input.{src}",
+                ]
+                await self._run_command(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout,
+                                        env=_soffice_env(profile.temp_dir))
 
-        with Workspace() as ws:
-            ws.write(f"input.{src}", data)
-            argv = [
-                self.resolved_binary(),
-                "--headless",
-                "--norestore",
-                "--nolockcheck",
-                "--nodefault",
-                f"-env:UserInstallation={profile_url}",
-                "--convert-to", target,
-                "--outdir", str(ws.path),
-                f"input.{src}",
-            ]
-            await self._run_command(argv, cwd=ws.path, src=src, dst=dst, timeout=timeout,
-                                    env=_soffice_env())
-
-            # soffice does not accept a custom output name; pick it up by extension
-            try:
-                produced = ws.find_one(f"input.{dst}")
-            except FileNotFoundError:
-                raise ConversionFailedError(
-                    self.name, src, dst,
-                    "LibreOffice reported success but produced no output "
-                    "(typically a corrupt or password-protected source file)",
-                )
-            result = produced.read_bytes()
+                # soffice does not accept a custom output name; pick it up by extension
+                try:
+                    produced = ws.find_one(f"input.{dst}")
+                except FileNotFoundError:
+                    raise ConversionFailedError(
+                        self.name, src, dst,
+                        "LibreOffice reported success but produced no output "
+                        "(typically a corrupt or password-protected source file)",
+                    )
+                result = produced.read_bytes()
+        finally:
+            # Success, failure, timeout or a cancelled request: the profile goes.
+            profile.discard()
 
         if not result:
             raise ConversionFailedError(self.name, src, dst, "empty output file")
