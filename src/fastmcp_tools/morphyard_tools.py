@@ -28,6 +28,7 @@ from fastmcp.utilities.types import File
 from pydantic import Field
 
 from src.domain.convert import pdfops
+from src.domain.convert.limiter import conversion_slot
 from src.domain.convert.registry import (
     FIDELITY_LOSSY,
     available_engines,
@@ -365,7 +366,8 @@ def register_morphyard_tools(mcp: FastMCP):
                 "Convert it to PDF with convert_document first."
             ]
 
-        data = await pdfops.extract_pages(source.data, pages)
+        async with conversion_slot():
+            data = await pdfops.extract_pages(source.data, pages)
         name = f"{source.name}_p{pages.replace(',', '_').replace('-', 'to')}"
         return [
             f"Extracted pages {pages}, {len(data) / 1024:.1f} KB",
@@ -389,7 +391,8 @@ def register_morphyard_tools(mcp: FastMCP):
         if source.fmt != "pdf":
             return [f"This is not a PDF (detected {source.fmt})."]
 
-        chunks = await pdfops.split_pdf(source.data, pages_per_file)
+        async with conversion_slot():
+            chunks = await pdfops.split_pdf(source.data, pages_per_file)
         if len(chunks) > 50:
             return [
                 f"This would produce {len(chunks)} files, which is too many. "
@@ -445,7 +448,8 @@ def register_morphyard_tools(mcp: FastMCP):
         if source.fmt != "pdf":
             return [f"This is not a PDF (detected {source.fmt})."]
 
-        data = await pdfops.rotate_pages(source.data, degrees, pages)
+        async with conversion_slot():
+            data = await pdfops.rotate_pages(source.data, degrees, pages)
         scope = pages or "all pages"
         return [
             f"Rotated {scope} by {degrees} degrees",
@@ -468,7 +472,8 @@ def register_morphyard_tools(mcp: FastMCP):
         if source.fmt != "pdf":
             return [f"This is not a PDF (detected {source.fmt})."]
 
-        data = await pdfops.encrypt_pdf(source.data, password)
+        async with conversion_slot():
+            data = await pdfops.encrypt_pdf(source.data, password)
         return [
             "Encrypted. The open password is the one the user specified; remind them "
             "to keep it safe (it now appears in the conversation, so it is best not "

@@ -12,9 +12,20 @@ Everything is in [`config/config.yaml`](../config/config.yaml) and reads environ
 | `AUTH_ENABLED` | `true` | Set to `false` only for local experiments. |
 | `MAX_INPUT_MB` | `50` | Per-file limit; also raises the MCP transport body limit (×1.5). |
 | `ENGINE_TIMEOUT` | engine default | Seconds per engine call, applied to every engine. Unset keeps each engine's own limit: LibreOffice 180, Pandoc 120, OCR 300. |
+| `MORPHYARD_MAX_CONCURRENT_CONVERSIONS` | CPUs, at most 8 | Conversions running at once, all engines together. See [Concurrent conversions](#concurrent-conversions). |
+| `MORPHYARD_MAX_QUEUED_CONVERSIONS` | 4 × the limit | How many more wait for a slot; `0` refuses at once when every slot is taken. |
+| `MORPHYARD_QUEUE_TIMEOUT` | `30` | Seconds a request may wait for a slot before it is refused as busy. |
 | `LOG_LEVEL` | `INFO` | |
 
 In the YAML, `auth.required_scopes` lets you demand a scope such as `mcp:tools:invoke` on every token, and `auth.audience` overrides the derived audience for the rare case where the registered resource URI is not `<base_url>/mcp`.
+
+## Concurrent conversions
+
+Each conversion takes one slot for its whole run (every hop of a multi-hop path included), whichever engine does the work: LibreOffice, Pandoc, Tesseract, Poppler or the built-in ones. There is one limit for all engines, not one each, because they all compete for the same CPU and memory and a request uses its engines one after another; a slot is at most one engine process at a time. `list_supported_conversions` and `inspect_document` take no slot.
+
+A request that finds every slot taken waits in a first-in, first-out queue. It is refused straight away when `MORPHYARD_MAX_QUEUED_CONVERSIONS` requests are already waiting, and after waiting `MORPHYARD_QUEUE_TIMEOUT` seconds. The refusal is an MCP tool error that says the server is busy, that nothing was started and to retry the same call after a few seconds (over HTTP it would be `503` with a `Retry-After` header). `GET /health` shows the current state under `conversions`: `running`, `queued` and the three limits.
+
+The default limit is the number of CPUs the process may use, capped at 8 because LibreOffice and Tesseract need a few hundred MB each and memory usually runs out before CPUs do. Raise it on a large machine with memory to spare; lower it on a small one. Each waiting request holds its upload in memory (up to `MAX_INPUT_MB`), which is what the queue length bounds. The limit applies per server process: with several workers or replicas, each has its own.
 
 ## Token revocation
 

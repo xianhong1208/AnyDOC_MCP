@@ -6,6 +6,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- A limit on concurrent conversions, with a queue (#23). There was none: every request started its engine at once, so a burst of uploads meant that many soffice processes competing for the same CPU and memory. Now at most `MORPHYARD_MAX_CONCURRENT_CONVERSIONS` conversions run at once (default: the CPUs the process may use, at most 8), across all engines together; a request holds one slot for its whole run, every hop included. Up to `MORPHYARD_MAX_QUEUED_CONVERSIONS` more (default 4 × the limit; `0` = no queue) wait first-in, first-out for up to `MORPHYARD_QUEUE_TIMEOUT` seconds (default 30). Past that a tool answers with an MCP tool error saying the server is busy, that nothing was started and to retry the same call shortly (`server_busy`, HTTP 503 with `Retry-After` if raised behind a REST route). Requests are validated before they queue, so a bad request is still answered at once. `GET /health` reports `conversions`: running, queued and the limits. `list_supported_conversions` and `inspect_document` take no slot.
+
 ### Docs
 - Docs: roadmap and README rewritten. A new `ROADMAP.md` / `ROADMAP.zh-TW.md` lists what shipped and the plan to 1.8, with a GitHub milestone per version. Both READMEs follow a shorter layout (badges, an example tool call from a real run, quick start, deployment options); the tool and format tables, known limits, configuration (with the renamed variables) and revocation-feed setup, and testing moved to `docs/tools`, `docs/configuration` and `docs/development` (English and Traditional Chinese). The local-experiment command no longer points at a `config/config.test.yaml` that does not exist.
 

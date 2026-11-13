@@ -47,6 +47,11 @@ convert:
   max_input_mb: ${MAX_INPUT_MB:-50}         # per-file limit
   engine_timeout_sec: ${ENGINE_TIMEOUT:-}    # seconds per engine call; empty = each engine's default (LibreOffice 180, Pandoc 120, OCR 300)
   max_hops: 3                               # longest multi-hop conversion path (overrides registry.MAX_HOPS)
+  # Conversions beyond the limit wait in a first-in, first-out queue; when it is full, or a request
+  # has waited queue_timeout_sec, it is refused as busy (MCP tool error; HTTP 503 + Retry-After).
+  max_concurrent_conversions: ${MORPHYARD_MAX_CONCURRENT_CONVERSIONS:-}   # empty = CPUs available, at most 8
+  max_queued_conversions: ${MORPHYARD_MAX_QUEUED_CONVERSIONS:-}           # empty = 4 x the limit; 0 = no queue
+  queue_timeout_sec: ${MORPHYARD_QUEUE_TIMEOUT:-30}                       # longest wait for a slot, seconds
 
 modules:
   enabled:
