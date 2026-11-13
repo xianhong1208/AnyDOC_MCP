@@ -12,6 +12,7 @@ The MCP tool layer must never touch base64 or engines; it talks to this layer on
 
 import base64
 
+from src.domain.convert.limiter import conversion_slot
 from src.domain.convert.registry import ENGINES, Route, plan_conversion, resolve_formats
 from src.domain.convert.types import (
     DOCUMENT_FORMATS,
@@ -232,12 +233,17 @@ def resolve_artifact_input(
 
 
 async def run_plan(source: SourceFile, plan: list[Route], **opts) -> bytes:
-    """Execute every hop of the path in order"""
+    """Execute every hop of the path in order, in one conversion slot (limiter.py)
+
+    The slot is taken here, after the request has been validated, so a bad request
+    is answered at once even when the server is busy.
+    """
     data = source.data
-    for hop, route in enumerate(plan, start=1):
-        engine = ENGINES[route.engine]
-        logger.info(f"Hop {hop}/{len(plan)}: {route.describe()}")
-        data = await engine.convert(data, route.src, route.dst, **opts)
+    async with conversion_slot():
+        for hop, route in enumerate(plan, start=1):
+            engine = ENGINES[route.engine]
+            logger.info(f"Hop {hop}/{len(plan)}: {route.describe()}")
+            data = await engine.convert(data, route.src, route.dst, **opts)
     return data
 
 

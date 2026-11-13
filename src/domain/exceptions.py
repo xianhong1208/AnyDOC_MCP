@@ -19,9 +19,10 @@ class DomainException(Exception):
         super().__init__(message)
 
 
-# error_code -> HTTP status. The current domain exceptions (UnsupportedFormatError,
-# NoConversionPathError, ConversionFailedError in convert/types.py) all map to 500.
-_HTTP_STATUS_BY_ERROR_CODE: dict[str, int] = {}
+# error_code -> HTTP status. The conversion errors (UnsupportedFormatError,
+# NoConversionPathError, ConversionFailedError in convert/types.py) map to 500.
+# server_busy (convert/limiter.py) is 503, sent with a Retry-After header.
+_HTTP_STATUS_BY_ERROR_CODE: dict[str, int] = {"server_busy": 503}
 
 
 def get_http_status_for_exception(exception: DomainException) -> int:

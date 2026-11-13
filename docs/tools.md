@@ -53,6 +53,7 @@ The engine table, the planner's rules and the format-detection details are in [d
 
 - One file per call (no `pdf_merge` tool yet; the merge logic exists in `pdfops`).
 - 50 MB per file, 30 pages per OCR run.
+- A limited number of conversions run at once (by default the CPU count, at most 8); more wait in a queue, and past its length or wait time a tool answers "the server is busy" and should be called again a little later. See [Concurrent conversions](configuration.md#concurrent-conversions).
 - PDF → editable formats is always lossy; tables inside PDFs are recovered heuristically.
 - Images are kept but appended at the end of extracted Markdown, not at their original position.
 - `.xlsb` is not supported.

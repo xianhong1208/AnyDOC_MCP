@@ -144,7 +144,7 @@ Either way, `MORPHYARD_BASE_URL` must be the address clients use, because the to
 | Document | What is in it |
 |---|---|
 | [Tools and formats](docs/tools.md) | The eight tools, supported formats, how a conversion runs, known limits |
-| [Configuration](docs/configuration.md) | Environment variables and the MCP Gate revocation feed |
+| [Configuration](docs/configuration.md) | Environment variables, concurrent conversions and the MCP Gate revocation feed |
 | [Architecture](docs/architecture.md) | Module layout, engines and fidelity, format detection, conversion planning, test layers |
 | [Development](docs/development.md) | Setting up, the three test layers, CI, how to contribute |
 | [Roadmap](ROADMAP.md) | What shipped and what comes next |

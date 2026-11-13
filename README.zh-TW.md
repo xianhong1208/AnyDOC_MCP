@@ -144,7 +144,7 @@ uv run python scripts/mcp_smoke.py
 | 文件 | 內容 |
 |---|---|
 | [工具與格式](docs/tools.zh-TW.md) | 八個工具、支援的格式、一次轉換如何執行、已知限制 |
-| [設定](docs/configuration.zh-TW.md) | 環境變數與 MCP Gate revocation feed |
+| [設定](docs/configuration.zh-TW.md) | 環境變數、同時轉換與 MCP Gate revocation feed |
 | [架構](docs/architecture.md)（英文） | 模組配置、引擎與 fidelity、格式偵測、轉換規劃、測試分層 |
 | [開發](docs/development.zh-TW.md) | 準備環境、三層測試、CI、如何貢獻 |
 | [發展路線圖](ROADMAP.zh-TW.md) | 已發布與接下來的內容 |
