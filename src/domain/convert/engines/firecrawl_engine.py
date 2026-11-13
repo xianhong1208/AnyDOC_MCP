@@ -1,6 +1,6 @@
-"""anydoc engine: Office / PDF / EPUB -> GitHub-Flavored Markdown
+"""firecrawl engine: Office / PDF / EPUB -> GitHub-Flavored Markdown
 
-Firecrawl's anydoc (Rust with PyO3 bindings, MIT). It replaced MarkItDown for
+Firecrawl's document-to-Markdown library (firecrawl-anydoc; Rust with PyO3 bindings, MIT). It replaced MarkItDown for
 these reasons:
 
   speed      measured 22x faster on docx, 86x on xlsx, 17x on epub, 2x on pdf
@@ -14,7 +14,7 @@ these reasons:
 It only does one-way "document -> Markdown" and never produces files; file
 generation remains the job of LibreOffice and Pandoc.
 
-anydoc does not handle images, and it explicitly rejects scanned PDFs (see the
+firecrawl does not handle images, and it explicitly rejects scanned PDFs (see the
 OCR fallback below).
 """
 
@@ -27,7 +27,7 @@ from src.log import get_mcptools_logger
 
 logger = get_mcptools_logger()
 
-# Source formats anydoc accepts (all convert to md only). html / json / xml /
+# Source formats firecrawl accepts (all convert to md only). html / json / xml /
 # txt are not included; those go to Pandoc and TextEngine.
 SUPPORTED_SOURCES = {
     "pdf", "docx", "doc", "odt", "rtf", "epub",
@@ -43,7 +43,7 @@ _IMAGE_MIME_BY_EXT = {
 
 
 def _extract_asset_images(data: bytes, fmt) -> list:
-    """Pull embedded images from anydoc's document model
+    """Pull embedded images from firecrawl's document model
 
     Returns [(index, media_type, bytes), ...].
 
@@ -55,7 +55,7 @@ def _extract_asset_images(data: bytes, fmt) -> list:
     survives as a piece of text), so getting images always means going through
     to_document.
 
-    Not applicable to PDF: anydoc refuses to_document for PDF ("PDF converts
+    Not applicable to PDF: firecrawl refuses to_document for PDF ("PDF converts
     directly to Markdown"); PDF images are extracted with pypdf instead.
     """
     import anydoc
@@ -105,7 +105,7 @@ async def _pdf_images_markdown(pdf_bytes: bytes) -> str:
     except Exception as e:
         # A failed image extraction must not fail the whole conversion; the
         # text is still a valuable result
-        logger.warning(f"[anydoc] image extraction failed, continuing text-only: {e}")
+        logger.warning(f"[firecrawl] image extraction failed, continuing text-only: {e}")
         return ""
 
     if not images:
@@ -116,7 +116,7 @@ async def _pdf_images_markdown(pdf_bytes: bytes) -> str:
         ext = name.rsplit(".", 1)[-1].lower() if "." in name else "png"
         items.append((f"Page {page_no}", _IMAGE_MIME_BY_EXT.get(ext, "image/png"), blob))
 
-    logger.info(f"[anydoc] embedded {len(images)} image(s) as data URIs")
+    logger.info(f"[firecrawl] embedded {len(images)} image(s) as data URIs")
     return _render_image_section(
         items, "Images from the original document",
         "The images below were extracted from the PDF and are listed by page; "
@@ -124,10 +124,10 @@ async def _pdf_images_markdown(pdf_bytes: bytes) -> str:
     )
 
 
-class AnydocEngine(ConversionEngine):
+class FirecrawlEngine(ConversionEngine):
     """firecrawl-anydoc (Rust, pure wheel install, no system dependencies)"""
 
-    name = "anydoc"
+    name = "firecrawl"
 
     def is_available(self) -> bool:
         try:
@@ -141,7 +141,7 @@ class AnydocEngine(ConversionEngine):
 
     async def convert(self, data: bytes, src: str, dst: str, **opts) -> bytes:
         if dst != "md":
-            raise ConversionFailedError(self.name, src, dst, "anydoc only produces markdown")
+            raise ConversionFailedError(self.name, src, dst, "firecrawl only produces markdown")
 
         try:
             import anydoc
@@ -150,7 +150,7 @@ class AnydocEngine(ConversionEngine):
                 self.name, src, dst, "firecrawl-anydoc package not installed"
             )
 
-        # Pass the format explicitly instead of letting anydoc sniff: our
+        # Pass the format explicitly instead of letting firecrawl sniff: our
         # detection chain (extension -> MIME -> magic bytes) is more reliable
         # than content sniffing, especially for ZIP-based Office formats.
         fmt = anydoc.format_from_extension(src)
@@ -158,7 +158,7 @@ class AnydocEngine(ConversionEngine):
         def _run() -> str:
             return anydoc.to_markdown_bytes(data, fmt)
 
-        # Get the text first, whether from anydoc itself or the OCR fallback;
+        # Get the text first, whether from firecrawl itself or the OCR fallback;
         # image embedding happens once, at the end.
         #
         # This used to be a `return fallback` early exit, so scanned/image-only
@@ -196,7 +196,7 @@ class AnydocEngine(ConversionEngine):
                 text += await self._asset_images_markdown(data, fmt)
 
         result = text.encode("utf-8")
-        logger.info(f"[anydoc] {src} → md: {len(data)} → {len(result)} bytes")
+        logger.info(f"[firecrawl] {src} → md: {len(data)} → {len(result)} bytes")
         return result
 
     async def _asset_images_markdown(self, data: bytes, fmt) -> str:
@@ -212,12 +212,12 @@ class AnydocEngine(ConversionEngine):
         except Exception as e:
             # This path is a bonus; its failure must not take the already
             # extracted text down with it
-            logger.warning(f"[anydoc] asset extraction failed, text only: {e}")
+            logger.warning(f"[firecrawl] asset extraction failed, text only: {e}")
             return ""
 
         if not items:
             return ""
-        logger.info(f"[anydoc] embedded {len(items)} asset image(s)")
+        logger.info(f"[firecrawl] embedded {len(items)} asset image(s)")
         return _render_image_section(
             [(f"Image {index}", mime, blob) for index, mime, blob in items],
             "Images from the original document",
@@ -241,7 +241,7 @@ class AnydocEngine(ConversionEngine):
                        reason: str, **opts) -> bytes | None:
         """OCR takeover for scanned PDFs
 
-        On a PDF without a text layer anydoc raises an explicit
+        On a PDF without a text layer firecrawl raises an explicit
         `UnsupportedError: PDF has no extractable text (Scanned, N pages): OCR is required`.
         A clean signal, unlike MarkItDown, which silently returned an empty string.
 
@@ -258,9 +258,9 @@ class AnydocEngine(ConversionEngine):
         ocr = OcrEngine()
         if not ocr.can_ocr_pdf():
             logger.warning(
-                f"[anydoc] {reason} -- OCR required but tesseract/poppler not installed"
+                f"[firecrawl] {reason} -- OCR required but tesseract/poppler not installed"
             )
             return None
 
-        logger.info(f"[anydoc] {reason} → falling back to OCR")
+        logger.info(f"[firecrawl] {reason} → falling back to OCR")
         return await ocr.convert(data, src, dst, **opts)

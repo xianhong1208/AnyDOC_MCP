@@ -29,7 +29,7 @@ from src.auth.revocation import (
     RevocationSettings,
 )
 ISSUER = "http://gate.test:4568"
-BASE_URL = "http://anydoc.test:5050"
+BASE_URL = "http://morphyard.test:5050"
 AUDIENCE = f"{BASE_URL}/mcp"
 
 
@@ -322,7 +322,7 @@ def _config(auth_enabled=True, **rev):
                                                 revocation=RevocationConfig(**rev)))
 
 
-REFS = {"auth.revocation.client_secret": "ANYDOC_REVOCATION_CLIENT_SECRET"}
+REFS = {"auth.revocation.client_secret": "MORPHYARD_REVOCATION_CLIENT_SECRET"}
 
 
 def test_build_disabled_by_default():
@@ -405,7 +405,7 @@ def test_init_revocation_installs_and_clears_the_list():
 
 def test_init_revocation_refuses_a_literal_secret():
     from src.auth import init_revocation
-    with pytest.raises(RuntimeError, match="ANYDOC_REVOCATION_CLIENT_SECRET"):
+    with pytest.raises(RuntimeError, match="MORPHYARD_REVOCATION_CLIENT_SECRET"):
         init_revocation(_app_config(enabled=True, client_id="c", client_secret="s"), env_refs={})
 
 
@@ -427,8 +427,8 @@ def test_config_yaml_template_ships_disabled_with_env_refs():
     raw = yaml.safe_load((pathlib.Path(__file__).parent.parent / "config" / "config.yaml")
                          .read_text(encoding="utf-8"))
     refs = env_refs(raw)
-    assert refs["auth.revocation.client_secret"] == "ANYDOC_REVOCATION_CLIENT_SECRET"
-    assert refs["auth.revocation.client_id"] == "ANYDOC_REVOCATION_CLIENT_ID"
+    assert refs["auth.revocation.client_secret"] == "MORPHYARD_REVOCATION_CLIENT_SECRET"
+    assert refs["auth.revocation.client_id"] == "MORPHYARD_REVOCATION_CLIENT_ID"
     assert raw["auth"]["revocation"]["enabled"].endswith(":-false}")
 
 

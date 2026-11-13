@@ -1,10 +1,13 @@
 # Changelog
 
-All notable changes to AnyDoc are documented here. The format is based on
+All notable changes to Morphyard (formerly AnyDoc) are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+- Renamed from AnyDoc to Morphyard; environment variables are now `MORPHYARD_*` (the `ANYDOC_*` names are no longer read): `MORPHYARD_BASE_URL`, `MORPHYARD_REVOCATION_ENABLED`, `MORPHYARD_REVOCATION_CLIENT_ID`, `MORPHYARD_REVOCATION_CLIENT_SECRET`, `MORPHYARD_REVOCATION_POLL_INTERVAL`, `MORPHYARD_REVOCATION_FAIL_MODE`. The Python project is `morphyard`, MCP serverInfo reports `Morphyard`, and the config section and tool module are `morphyard` / `src.fastmcp_tools.morphyard_tools`. The document → Markdown engine is now reported as `firecrawl` (it was `anydoc`, after the firecrawl-anydoc library it wraps). Port 5055 and the token audience `<base_url>/mcp` are unchanged.
 
 ## [1.2.1] — 2026-11-09
 
@@ -49,9 +52,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 First release: a document conversion MCP server (Office ↔ PDF, Markdown ↔ Word, spreadsheets, presentations, images, OCR, PDF split / extract / rotate / encrypt) secured by MCP Gate OAuth 2.1.
 
-[Unreleased]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.2.1...dev
-[1.2.1]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.2.0...v1.2.1
-[1.2.0]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.1...v1.2.0
-[1.1.1]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.0...v1.1.1
-[1.1.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.1.0
-[1.0.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.0.0
+[Unreleased]: https://github.com/xianhong1208/morphyard/compare/v1.2.1...dev
+[1.2.1]: https://github.com/xianhong1208/morphyard/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/xianhong1208/morphyard/compare/v1.1.1...v1.2.0
+[1.1.1]: https://github.com/xianhong1208/morphyard/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/xianhong1208/morphyard/releases/tag/v1.1.0
+[1.0.0]: https://github.com/xianhong1208/morphyard/releases/tag/v1.0.0

@@ -1,10 +1,12 @@
-# AnyDoc
+# Morphyard
 
 **文件格式轉換 MCP 服務。** 上傳一個檔案，拿回你需要的格式：Office ↔ PDF、Markdown ↔ Word、試算表、簡報、圖片、掃描頁面的 OCR，以及 PDF 的分割／抽頁／旋轉／加密 —— 全部以 MCP 工具提供，任何支援 MCP 的 client（Claude Code、Claude Desktop、Cursor、FastMCP client）都能呼叫。
 
-認證委託給 [MCP Gate](https://github.com/xianhong1208/MCP_Gate)：AnyDoc 是一個 OAuth 2.1 resource server，透過 MCP Gate 的 JWKS 離線驗證其 RS256 token。它本身不儲存使用者，也不簽發 token。
+認證委託給 [MCP Gate](https://github.com/xianhong1208/MCP_Gate)：Morphyard 是一個 OAuth 2.1 resource server，透過 MCP Gate 的 JWKS 離線驗證其 RS256 token。它本身不儲存使用者，也不簽發 token。
 
 [English](README.md) · [快速開始](#快速開始) · [工具](#工具) · [運作方式](#運作方式) · [設定](#設定) · [架構](docs/architecture.md)
+
+> **前身為 AnyDoc。** 於 1.2.2 改名，舊的變數名稱不再讀取：`ANYDOC_BASE_URL` → `MORPHYARD_BASE_URL`、`ANYDOC_REVOCATION_ENABLED` → `MORPHYARD_REVOCATION_ENABLED`、`ANYDOC_REVOCATION_CLIENT_ID` → `MORPHYARD_REVOCATION_CLIENT_ID`、`ANYDOC_REVOCATION_CLIENT_SECRET` → `MORPHYARD_REVOCATION_CLIENT_SECRET`、`ANYDOC_REVOCATION_POLL_INTERVAL` → `MORPHYARD_REVOCATION_POLL_INTERVAL`、`ANYDOC_REVOCATION_FAIL_MODE` → `MORPHYARD_REVOCATION_FAIL_MODE`。
 
 ## 主要特色
 
@@ -29,25 +31,25 @@ sudo apt-get install -y libreoffice-writer libreoffice-calc libreoffice-impress 
 `fonts-noto-cjk` 不可省略：少了它，LibreOffice 產出的 PDF 中 CJK 文字會變成 `□□□`，而且回報成功。Tesseract 語言包同樣不可省略 —— 缺少語言包會讓 Tesseract 直接無法啟動，而不是降級處理。
 
 ```bash
-git clone https://github.com/xianhong1208/AnyDOC_MCP.git
-cd AnyDOC_MCP
+git clone https://github.com/xianhong1208/morphyard.git
+cd morphyard
 uv sync
 ```
 
 或者完全略過系統套件，改用內建所有引擎的容器：
 
 ```bash
-docker build -t anydoc .
-docker run -p 5055:5055 -e MCP_GATE_URL=http://mcp-gate:4568 anydoc
+docker build -t morphyard .
+docker run -p 5055:5055 -e MCP_GATE_URL=http://mcp-gate:4568 morphyard
 ```
 
 ## 快速開始
 
-### 1. 啟動 MCP Gate 並註冊 AnyDoc
+### 1. 啟動 MCP Gate 並註冊 Morphyard
 
-執行 [MCP Gate](https://github.com/xianhong1208/MCP_Gate)（預設 `http://localhost:4568`），註冊一個指向本伺服器的服務：host `127.0.0.1`、port `5055`、path `/mcp`。MCP Gate 會從這筆註冊推導 token 的 audience（`http://127.0.0.1:5055/mcp`）；AnyDoc 則從 `ANYDOC_BASE_URL` 推導出同一個值，所以兩邊只要 host 與 port 一致即可。
+執行 [MCP Gate](https://github.com/xianhong1208/MCP_Gate)（預設 `http://localhost:4568`），註冊一個指向本伺服器的服務：host `127.0.0.1`、port `5055`、path `/mcp`。MCP Gate 會從這筆註冊推導 token 的 audience（`http://127.0.0.1:5055/mcp`）；Morphyard 則從 `MORPHYARD_BASE_URL` 推導出同一個值，所以兩邊只要 host 與 port 一致即可。
 
-### 2. 啟動 AnyDoc
+### 2. 啟動 Morphyard
 
 ```bash
 cp .env.example .env          # defaults already point at http://localhost:4568
@@ -62,10 +64,10 @@ uv run python main.py
 
 ```bash
 # Claude Code (OAuth: completes sign-in through MCP Gate on first use)
-claude mcp add --transport http anydoc http://localhost:5055/mcp
+claude mcp add --transport http morphyard http://localhost:5055/mcp
 
 # Any client with a personal access token issued by MCP Gate
-claude mcp add --transport http anydoc http://localhost:5055/mcp \
+claude mcp add --transport http morphyard http://localhost:5055/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
@@ -139,7 +141,7 @@ client ──(bearer token)──▶ /mcp ──▶ tools ──▶ service.py �
 |---|---|---|
 | `SERVER_HOST` / `SERVER_PORT` | `0.0.0.0` / `5055` | 綁定位址。 |
 | `MCP_GATE_URL` | `http://localhost:4568` | 簽發 token 的 MCP Gate（`auth.issuer`）。未設定時仍會讀取改名前的 `MCP_CENTER_URL`。 |
-| `ANYDOC_BASE_URL` | `http://127.0.0.1:5055` | 本伺服器對外的位址。token 的 audience 為 `<ANYDOC_BASE_URL>/mcp`，必須等於在 MCP Gate 註冊的服務；也會出現在 protected-resource metadata 中。 |
+| `MORPHYARD_BASE_URL` | `http://127.0.0.1:5055` | 本伺服器對外的位址。token 的 audience 為 `<MORPHYARD_BASE_URL>/mcp`，必須等於在 MCP Gate 註冊的服務；也會出現在 protected-resource metadata 中。 |
 | `AUTH_ENABLED` | `true` | 只有本機實驗時才設為 `false`。 |
 | `MAX_INPUT_MB` | `50` | 單檔上限；同時提高 MCP 傳輸層的 body 上限（×1.5）。 |
 | `ENGINE_TIMEOUT` | 各引擎預設 | 每次引擎呼叫的秒數上限，套用到所有引擎。未設定時各引擎維持自己的上限：LibreOffice 180、Pandoc 120、OCR 300。 |
@@ -149,27 +151,27 @@ YAML 中的 `auth.required_scopes` 可要求每個 token 都必須帶有某個 s
 
 ### Token 撤銷
 
-AnyDoc 以離線方式驗證 MCP Gate 的 token，因此預設情況下，在 MCP Gate 撤銷的 token 在這裡會一直有效到過期為止——而 personal access token 最長可活一年。開啟 **revocation feed** 後，AnyDoc 會在背景輪詢 MCP Gate 的 `POST /oauth/revoked`（每 `poll_interval_sec` 秒，帶 jitter 與錯誤退避），在記憶體保存「已撤銷但尚未過期」的 `jti`，並對 `/mcp` 上的這些 token 回應 401 `invalid_token`。撤銷約在一個輪詢間隔內生效。
+Morphyard 以離線方式驗證 MCP Gate 的 token，因此預設情況下，在 MCP Gate 撤銷的 token 在這裡會一直有效到過期為止——而 personal access token 最長可活一年。開啟 **revocation feed** 後，Morphyard 會在背景輪詢 MCP Gate 的 `POST /oauth/revoked`（每 `poll_interval_sec` 秒，帶 jitter 與錯誤退避），在記憶體保存「已撤銷但尚未過期」的 `jti`，並對 `/mcp` 上的這些 token 回應 401 `invalid_token`。撤銷約在一個輪詢間隔內生效。
 
 | 變數 / 設定 | 預設 | 說明 |
 |---|---|---|
-| `ANYDOC_REVOCATION_ENABLED`（`auth.revocation.enabled`） | `false` | 開啟 feed。關閉 = 不輪詢。 |
-| `ANYDOC_REVOCATION_CLIENT_ID` | — | 在 MCP Gate 註冊的 resource-server client（見下方）。 |
-| `ANYDOC_REVOCATION_CLIENT_SECRET` | — | 它的 secret。在 YAML 中**必須**維持 `${ENV_VAR}` 參照；寫成字面值會拒絕啟動。 |
-| `ANYDOC_REVOCATION_POLL_INTERVAL`（`poll_interval_sec`） | `30` | 輪詢間隔秒數（5–3600）。 |
-| `ANYDOC_REVOCATION_FAIL_MODE`（`fail_mode`） | `open` | MCP Gate 連不上時：`open` 繼續接受 token 並大聲記錄；`closed` 在連續 `stale_after_intervals` × `poll_interval_sec`（YAML，預設 4）沒有成功輪詢後拒絕所有 token，啟動後第一次輪詢成功前也一樣。 |
+| `MORPHYARD_REVOCATION_ENABLED`（`auth.revocation.enabled`） | `false` | 開啟 feed。關閉 = 不輪詢。 |
+| `MORPHYARD_REVOCATION_CLIENT_ID` | — | 在 MCP Gate 註冊的 resource-server client（見下方）。 |
+| `MORPHYARD_REVOCATION_CLIENT_SECRET` | — | 它的 secret。在 YAML 中**必須**維持 `${ENV_VAR}` 參照；寫成字面值會拒絕啟動。 |
+| `MORPHYARD_REVOCATION_POLL_INTERVAL`（`poll_interval_sec`） | `30` | 輪詢間隔秒數（5–3600）。 |
+| `MORPHYARD_REVOCATION_FAIL_MODE`（`fail_mode`） | `open` | MCP Gate 連不上時：`open` 繼續接受 token 並大聲記錄；`closed` 在連續 `stale_after_intervals` × `poll_interval_sec`（YAML，預設 4）沒有成功輪詢後拒絕所有 token，啟動後第一次輪詢成功前也一樣。 |
 
 第一次輪詢抓完整清單；之後只問上次以來的撤銷（重疊 30 秒），每小時再完整抓一次。token 本來就會過期之後，項目即被移除。啟動時會記錄 feed 是否啟用，`GET /health` 的 `revocation` 會顯示 `last_success`、`revoked_count`、`consecutive_failures`、`last_error`、`stale`；feed 過期時 `status` 會變成 `degraded`。
 
 **設定步驟**（每個部署做一次）：
 
-1. **在 MCP Gate 註冊 confidential client。** 主控台 → *OAuth Clients* → *Register trusted client*。名稱例如 `AnyDoc revocation feed`；*Redirect URIs* 留空；*Grant types* 只選 `client_credentials`；*Token endpoint authentication*：**Client secret (POST body)**（HTTP Basic 也可以，MCP Gate 兩者都接受）；*Resource server for*：**AnyDoc**。註冊後複製 `client_id`（`mcpc_…`）與 client secret——secret 只顯示一次。
-2. **綁定到 AnyDoc**——若步驟 1 已選 *Resource server for* 就已完成。否則在該 client 那一列點伺服器圖示（*Resource server…*），選 AnyDoc 服務後 *Save*；或以主控台管理員呼叫 `PUT /api/oauth/clients/<client_id>/resource-server`，body 為 `{"service_id": "<AnyDoc service id>"}`。該列會顯示 *Resource server for AnyDoc*。feed 只列出 audience 等於該服務 audience 的 token，所以它必須等於 `<ANYDOC_BASE_URL>/mcp`。
-3. **把憑證交給 AnyDoc**（環境變數或 `.env`），然後重啟：
+1. **在 MCP Gate 註冊 confidential client。** 主控台 → *OAuth Clients* → *Register trusted client*。名稱例如 `Morphyard revocation feed`；*Redirect URIs* 留空；*Grant types* 只選 `client_credentials`；*Token endpoint authentication*：**Client secret (POST body)**（HTTP Basic 也可以，MCP Gate 兩者都接受）；*Resource server for*：**Morphyard**。註冊後複製 `client_id`（`mcpc_…`）與 client secret——secret 只顯示一次。
+2. **綁定到 Morphyard**——若步驟 1 已選 *Resource server for* 就已完成。否則在該 client 那一列點伺服器圖示（*Resource server…*），選 Morphyard 服務後 *Save*；或以主控台管理員呼叫 `PUT /api/oauth/clients/<client_id>/resource-server`，body 為 `{"service_id": "<Morphyard service id>"}`。該列會顯示 *Resource server for Morphyard*。feed 只列出 audience 等於該服務 audience 的 token，所以它必須等於 `<MORPHYARD_BASE_URL>/mcp`。
+3. **把憑證交給 Morphyard**（環境變數或 `.env`），然後重啟：
    ```bash
-   ANYDOC_REVOCATION_ENABLED=true
-   ANYDOC_REVOCATION_CLIENT_ID=mcpc_...
-   ANYDOC_REVOCATION_CLIENT_SECRET=...
+   MORPHYARD_REVOCATION_ENABLED=true
+   MORPHYARD_REVOCATION_CLIENT_ID=mcpc_...
+   MORPHYARD_REVOCATION_CLIENT_SECRET=...
    ```
 4. **確認。** 啟動 log 會出現 `MCP Gate revocation feed: ENABLED …`；`curl -s localhost:5055/health` 會看到最近的 `revocation.last_success`。在 MCP Gate 撤銷一個測試 token，`poll_interval_sec` 內用它呼叫 `/mcp` 會得到 401。`last_error` 出現 `HTTP 401: invalid_client` 表示憑證錯誤；`HTTP 403: unauthorized_client` 表示 client 尚未綁定伺服器。
 

@@ -1,1 +1,1 @@
-"""AnyDoc source root package."""
+"""Morphyard source root package."""

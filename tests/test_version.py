@@ -1,4 +1,4 @@
-"""The version AnyDoc reports comes from pyproject.toml, whatever the config says.
+"""The version Morphyard reports comes from pyproject.toml, whatever the config says.
 
 1.1.0 shipped with config.yaml's app.version still at 1.0.0 and reported 1.0.0
 everywhere; these pin the single source of truth (src/version.py).

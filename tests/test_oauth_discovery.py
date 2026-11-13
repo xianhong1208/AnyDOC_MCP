@@ -13,7 +13,7 @@ def _client(auth_enabled: bool = True) -> TestClient:
     cfg = ConfigModel(
         server=ServerConfig(host="127.0.0.1", port=5050, transport="http"),
         auth=AuthConfig(enabled=auth_enabled, issuer="http://gate.test:4568",
-                        base_url="http://anydoc.test:5050"),
+                        base_url="http://morphyard.test:5050"),
         logging=LoggingConfig(level="WARNING"),
         app=AppConfig(name="T", version="1", title="T", description=""),
         modules=ModulesConfig(enabled=[]),
@@ -32,7 +32,7 @@ def test_root_protected_resource_matches_path_specific_one():
     c = _client()
     root = c.get("/.well-known/oauth-protected-resource").json()
     specific = c.get("/.well-known/oauth-protected-resource/mcp").json()
-    assert root["resource"] == specific["resource"] == "http://anydoc.test:5050/mcp"
+    assert root["resource"] == specific["resource"] == "http://morphyard.test:5050/mcp"
     # Exact string: mcp 2 clients reject "http://gate.test:4568/" as an issuer mismatch (RFC 8414 3.3)
     assert root["authorization_servers"] == specific["authorization_servers"] == ["http://gate.test:4568"]
 

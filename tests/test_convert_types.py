@@ -42,11 +42,11 @@ class TestNormalizeFormat:
         assert normalize_format("ppsx") == "pptx"
 
     def test_xlsb_maps_to_the_excel_family(self):
-        """XLSB is BIFF12 inside rather than XML, but anydoc reads it.
+        """XLSB is BIFF12 inside rather than XML, but firecrawl reads it.
 
         This test once asserted the opposite, based on "a synthetic BIFF12
-        container is rejected by anydoc"; but that file was never a valid xlsb,
-        so rejecting it was correct. Reading the anydoc source confirmed the
+        container is rejected by firecrawl"; but that file was never a valid xlsb,
+        so rejecting it was correct. Reading the firecrawl source confirmed the
         Format::Excel comment: "every container calamine reads: .xlsx, .xlsm,
         .xlsb, and binary .xls".
 
@@ -123,7 +123,7 @@ class TestContentSniffing:
         """XLSB's workbook is .bin rather than .xml, but still lives under xl/.
 
         It shares the internal code with xlsx; every engine detects the real
-        format from content, anydoc via calamine and LibreOffice via its own
+        format from content, firecrawl via calamine and LibreOffice via its own
         sniffing.
         """
         buf = io.BytesIO()
@@ -136,7 +136,7 @@ class TestContentSniffing:
         """ISO 32000 does not require %PDF- at offset 0; real readers accept leading junk.
 
         With a plain startswith, a PDF with a BOM or leading whitespace fails
-        detection. anydoc scans the first 1024 bytes; this mirrors that.
+        detection. firecrawl scans the first 1024 bytes; this mirrors that.
         """
         assert detect_format(None, None, b"\xef\xbb\xbf   %PDF-1.7 body") == "pdf"
         assert detect_format(None, None, b"\x00" * 500 + b"%PDF-1.4") == "pdf"
@@ -146,7 +146,7 @@ class TestContentSniffing:
     def test_ole_stream_names_are_matched_case_insensitively(self):
         """The CFB spec compares names upper-cased; producers spell them differently.
 
-        anydoc's detect.rs uses eq_ignore_ascii_case and notes "producers vary
+        firecrawl's detect.rs uses eq_ignore_ascii_case and notes "producers vary
         (WORKBOOK, BOOK)". A case-sensitive comparison misses those producers.
         """
         for written_as in ("Workbook", "WORKBOOK", "Book", "BOOK"):

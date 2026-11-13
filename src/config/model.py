@@ -20,7 +20,7 @@ class ServerConfig(BaseModel):
 class RevocationConfig(BaseModel):
     """MCP Gate's revocation feed (`auth.revocation`).
 
-    AnyDoc verifies tokens offline, so without this a token revoked in MCP Gate keeps
+    Morphyard verifies tokens offline, so without this a token revoked in MCP Gate keeps
     working until it expires. When enabled, a background task polls
     `<issuer>/oauth/revoked` and the /mcp verifier rejects listed tokens. The
     credentials belong to a confidential client registered in the MCP Gate console and

@@ -1,6 +1,6 @@
 """Plain-text formats -> Markdown
 
-Covers the few plain-text formats neither anydoc nor Pandoc handles (json /
+Covers the few plain-text formats neither firecrawl nor Pandoc handles (json /
 xml / tsv). These files are already text; "conversion" just wraps them in a
 shape the model reads comfortably: structured data goes into a code fence to
 keep indentation, and TSV is laid out as a Markdown table.
