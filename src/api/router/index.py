@@ -182,7 +182,7 @@ body{margin:0;font-family:-apple-system,"Segoe UI","PingFang TC","Microsoft Jhen
     </div>
   </div>
   <div class="footer">
-    AnyDoc &middot
+    Morphyard &middot
     MIT License &middot
     MCP endpoint: <code>/mcp</code>
   </div>
@@ -204,7 +204,7 @@ async def index(request: Request) -> HTMLResponse:
     app = request.app
     title = getattr(app, "title", "MCP Service")
     version = getattr(app, "version", "0.0.0")
-    description = getattr(app, "description", "") or "AnyDoc MCP service"
+    description = getattr(app, "description", "") or "Morphyard MCP service"
 
     instructions_md = getattr(app.state, "instructions", "") or ""
     instructions_html = (
@@ -212,7 +212,7 @@ async def index(request: Request) -> HTMLResponse:
         else "<p>(No instructions provided yet.)</p>"
     )
 
-    topbar = '  <div class="topbar"><span class="wordmark">AnyDoc</span></div>'
+    topbar = '  <div class="topbar"><span class="wordmark">Morphyard</span></div>'
 
     page = (
         _PAGE_TEMPLATE

@@ -12,7 +12,7 @@ import pytest
 from fastmcp import Client, FastMCP
 
 from src.domain.convert.types import ALL_FORMATS, FORMAT_MIME_TYPES, mime_type_for
-from src.fastmcp_tools.anydoc_tools import register_anydoc_tools
+from src.fastmcp_tools.morphyard_tools import register_morphyard_tools
 
 # Written out independently of FORMAT_MIME_TYPES so a typo there is caught.
 EXPECTED_MIME = {
@@ -60,7 +60,7 @@ def test_mime_type_for_matches_iana(fmt):
 async def test_convert_document_returns_the_registered_mime_type(fmt):
     """Same-format requests need no engine, so every output format can be checked here."""
     mcp = FastMCP("mime-test")
-    register_anydoc_tools(mcp)
+    register_morphyard_tools(mcp)
     async with Client(mcp) as client:
         result = await client.call_tool("convert_document", {
             "target_format": fmt,

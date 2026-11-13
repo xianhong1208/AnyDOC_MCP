@@ -1,6 +1,6 @@
 """FastMCP ``JWTVerifier`` that also honours MCP Gate's revocation feed.
 
-Governs the ``/mcp`` transport (the only authenticated surface of AnyDoc).
+Governs the ``/mcp`` transport (the only authenticated surface of Morphyard).
 """
 
 from __future__ import annotations

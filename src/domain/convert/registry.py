@@ -12,11 +12,11 @@ All three share one dataset, so the declared capability and the implementation
 
 from dataclasses import dataclass, replace
 
-from src.domain.convert.engines.anydoc_engine import (
-    SUPPORTED_SOURCES as ANYDOC_SOURCES,
+from src.domain.convert.engines.firecrawl_engine import (
+    SUPPORTED_SOURCES as FIRECRAWL_SOURCES,
 )
-from src.domain.convert.engines.anydoc_engine import (
-    AnydocEngine,
+from src.domain.convert.engines.firecrawl_engine import (
+    FirecrawlEngine,
 )
 from src.domain.convert.engines.base import ConversionEngine
 from src.domain.convert.engines.image import ImageEngine
@@ -47,7 +47,7 @@ logger = get_mcptools_logger()
 
 FIDELITY_HIGH = "high"              # layout, fonts, positions kept (LibreOffice, Pillow)
 FIDELITY_STRUCTURAL = "structural"  # headings/lists/tables kept, layout is not (Pandoc)
-FIDELITY_LOSSY = "lossy"            # content only, all styling lost (anydoc, OCR, TextEngine)
+FIDELITY_LOSSY = "lossy"            # content only, all styling lost (firecrawl, OCR, TextEngine)
 
 _FIDELITY_RANK = {FIDELITY_HIGH: 3, FIDELITY_STRUCTURAL: 2, FIDELITY_LOSSY: 1}
 
@@ -73,7 +73,7 @@ class Route:
 ENGINES: dict[str, ConversionEngine] = {
     "libreoffice": LibreOfficeEngine(),
     "pandoc": PandocEngine(),
-    "anydoc": AnydocEngine(),
+    "firecrawl": FirecrawlEngine(),
     "pillow": ImageEngine(),
     "ocr": OcrEngine(),
     "text": TextEngine(),
@@ -116,21 +116,21 @@ def _build_direct_routes() -> dict[tuple[str, str], Route]:
 
     # --- Engine overrides for text extraction (must be registered before Pandoc) ---
     # Several engines can serve the same (src, md); setdefault lets the first
-    # registration win. Listed here are sources where anydoc is clearly better
+    # registration win. Listed here are sources where firecrawl is clearly better
     # than Pandoc in practice:
     #
     #   epub -> md   Pandoc emits <span id="ch001.xhtml"></span> and <div class=...>
     #                EPUB-internal anchors, which are pure noise for the model;
-    #                anydoc produces clean headings and tables.
+    #                firecrawl produces clean headings and tables.
     #
     # docx / odt are deliberately not listed: Pandoc's output is just as clean
     # for them, and it keeps structural fidelity (round-trippable), which makes
-    # it a better intermediate for multi-hop paths than anydoc's lossy output.
-    add("epub", "md", "anydoc", FIDELITY_LOSSY, "text content extracted, styling not kept")
+    # it a better intermediate for multi-hop paths than firecrawl's lossy output.
+    add("epub", "md", "firecrawl", FIDELITY_LOSSY, "text content extracted, styling not kept")
 
     # --- Pandoc: semantic conversion between text formats ---
     # pptx is writer-only: pandoc can build slides from the heading hierarchy
-    # but cannot read pptx (reading pptx goes through anydoc or libreoffice).
+    # but cannot read pptx (reading pptx goes through firecrawl or libreoffice).
     pandoc_readers = ["md", "html", "docx", "odt", "epub", "rst", "tex", "txt"]
     pandoc_writers = ["md", "html", "docx", "odt", "epub", "rst", "tex", "txt",
                       "rtf", "pptx"]
@@ -140,15 +140,15 @@ def _build_direct_routes() -> dict[tuple[str, str], Route]:
                 add(src, dst, "pandoc", FIDELITY_STRUCTURAL,
                     "structure preserved, layout is not")
 
-    # --- anydoc: Office / PDF / EPUB -> md, content extraction ---
+    # --- firecrawl: Office / PDF / EPUB -> md, content extraction ---
     # Registered after Pandoc, so formats both can read (docx / odt / epub) go
     # to Pandoc first (it keeps more structure). Only what Pandoc cannot read
-    # (pdf / xlsx / pptx / csv) falls through to anydoc.
+    # (pdf / xlsx / pptx / csv) falls through to firecrawl.
     #
-    # Image formats are deliberately excluded: anydoc does not handle images;
+    # Image formats are deliberately excluded: firecrawl does not handle images;
     # those go to the OCR engine below.
-    for src in sorted(ANYDOC_SOURCES):
-        add(src, "md", "anydoc", FIDELITY_LOSSY, "text content extracted, styling not kept")
+    for src in sorted(FIRECRAWL_SOURCES):
+        add(src, "md", "firecrawl", FIDELITY_LOSSY, "text content extracted, styling not kept")
 
     # --- TextEngine: json / xml / tsv -> md ---
     for src in sorted(TEXT_SOURCES):

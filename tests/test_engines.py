@@ -156,26 +156,26 @@ class TestPdfImagePreservation:
         import asyncio
 
         from src.domain.convert import pdfops
-        from src.domain.convert.engines import anydoc_engine
+        from src.domain.convert.engines import firecrawl_engine
 
         async def boom(_data):
             raise RuntimeError("corrupt image object")
 
         monkeypatch.setattr(pdfops, "extract_images", boom)
-        assert asyncio.run(anydoc_engine._pdf_images_markdown(b"%PDF-fake")) == ""
+        assert asyncio.run(firecrawl_engine._pdf_images_markdown(b"%PDF-fake")) == ""
 
     def test_images_are_embedded_as_data_uris(self, monkeypatch):
         """Output must be data: URIs, never file path references."""
         import asyncio
 
         from src.domain.convert import pdfops
-        from src.domain.convert.engines import anydoc_engine
+        from src.domain.convert.engines import firecrawl_engine
 
         async def fake(_data):
             return [(3, "Im1.png", b"\x89PNG" + b"x" * 3000)]
 
         monkeypatch.setattr(pdfops, "extract_images", fake)
-        md = asyncio.run(anydoc_engine._pdf_images_markdown(b"%PDF-fake"))
+        md = asyncio.run(firecrawl_engine._pdf_images_markdown(b"%PDF-fake"))
         assert "data:image/png;base64," in md
         label = md.split("![]")[0]
         assert "3" in label, "the image must be labeled with its page number"
@@ -214,16 +214,16 @@ class TestPdfImagePreservation:
         assert len(result) == 2, f"expected 2 images after dedup, got {len(result)}"
         assert [r[0] for r in result] == [1, 1], "dedup must keep the page of first occurrence"
 
-    def test_office_sources_use_anydoc_assets_not_pypdf(self, monkeypatch):
-        """Images in docx / pptx / epub must come from anydoc's document model.
+    def test_office_sources_use_firecrawl_assets_not_pypdf(self, monkeypatch):
+        """Images in docx / pptx / epub must come from firecrawl's document model.
 
         to_markdown() drops images entirely (keeping only the alt text as a
         paragraph), so assets must be fetched via to_document() separately. The
-        pypdf route only applies to PDF; anydoc refuses to_document for PDF.
+        pypdf route only applies to PDF; firecrawl refuses to_document for PDF.
         """
         import asyncio
 
-        from src.domain.convert.engines import anydoc_engine
+        from src.domain.convert.engines import firecrawl_engine
 
         called = {}
 
@@ -231,9 +231,9 @@ class TestPdfImagePreservation:
             called["fmt"] = fmt
             return [(1, "image/png", b"\x89PNG" + b"z" * 4000)]
 
-        monkeypatch.setattr(anydoc_engine, "_extract_asset_images", fake_assets)
+        monkeypatch.setattr(firecrawl_engine, "_extract_asset_images", fake_assets)
         md = asyncio.run(
-            anydoc_engine.AnydocEngine()._asset_images_markdown(b"fake", "pptx")
+            firecrawl_engine.FirecrawlEngine()._asset_images_markdown(b"fake", "pptx")
         )
         assert "data:image/png;base64," in md
         assert called["fmt"] == "pptx"
@@ -242,14 +242,14 @@ class TestPdfImagePreservation:
         """Failing to fetch images is a bonus failing; the extracted text must not die with it."""
         import asyncio
 
-        from src.domain.convert.engines import anydoc_engine
+        from src.domain.convert.engines import firecrawl_engine
 
         def boom(data, fmt):
             raise RuntimeError("model unavailable")
 
-        monkeypatch.setattr(anydoc_engine, "_extract_asset_images", boom)
+        monkeypatch.setattr(firecrawl_engine, "_extract_asset_images", boom)
         assert asyncio.run(
-            anydoc_engine.AnydocEngine()._asset_images_markdown(b"fake", "docx")
+            firecrawl_engine.FirecrawlEngine()._asset_images_markdown(b"fake", "docx")
         ) == ""
 
 
@@ -272,9 +272,9 @@ class TestLossyConversionIsAllowedByDefault:
         document. A wrong warning misleads more than none.
         """
         from src.domain.convert.registry import Route
-        from src.fastmcp_tools.anydoc_tools import _fidelity_warning
+        from src.fastmcp_tools.morphyard_tools import _fidelity_warning
 
-        plan = [Route("pdf", "md", "anydoc", "lossy"),
+        plan = [Route("pdf", "md", "firecrawl", "lossy"),
                 Route("md", "docx", "pandoc", "structural")]
         warning = _fidelity_warning(plan)
         assert "image" in warning.lower()
@@ -283,7 +283,7 @@ class TestLossyConversionIsAllowedByDefault:
     def test_high_fidelity_path_gets_no_warning(self):
         """docx -> pdf keeps the layout; do not scare the user for nothing."""
         from src.domain.convert.registry import Route
-        from src.fastmcp_tools.anydoc_tools import _fidelity_warning
+        from src.fastmcp_tools.morphyard_tools import _fidelity_warning
 
         assert _fidelity_warning([Route("docx", "pdf", "libreoffice", "high")]) == ""
 

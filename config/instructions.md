@@ -1,4 +1,4 @@
-# AnyDoc — document format conversion service
+# Morphyard — document format conversion service
 
 Converts the user's uploaded files into the format they need, and provides PDF
 splitting, page extraction, rotation and encryption.

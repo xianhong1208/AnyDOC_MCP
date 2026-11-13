@@ -1,10 +1,12 @@
-# AnyDoc
+# Morphyard
 
 **A document conversion MCP server.** Upload a file, get it back in the format you need: Office ↔ PDF, Markdown ↔ Word, spreadsheets, presentations, images, OCR of scanned pages, and PDF split / extract / rotate / encrypt — all exposed as MCP tools that any MCP-capable client (Claude Code, Claude Desktop, Cursor, FastMCP clients) can call.
 
-Authentication is delegated to [MCP Gate](https://github.com/xianhong1208/MCP_Gate): AnyDoc is an OAuth 2.1 resource server that verifies MCP Gate's RS256 tokens offline through its JWKS. It never stores users or issues tokens itself.
+Authentication is delegated to [MCP Gate](https://github.com/xianhong1208/MCP_Gate): Morphyard is an OAuth 2.1 resource server that verifies MCP Gate's RS256 tokens offline through its JWKS. It never stores users or issues tokens itself.
 
 [繁體中文](README.zh-TW.md) · [Quick start](#quick-start) · [Tools](#tools) · [How it works](#how-it-works) · [Configuration](#configuration) · [Architecture](docs/architecture.md)
+
+> **Formerly AnyDoc.** Renamed in 1.2.2; the old variable names are no longer read: `ANYDOC_BASE_URL` → `MORPHYARD_BASE_URL`, `ANYDOC_REVOCATION_ENABLED` → `MORPHYARD_REVOCATION_ENABLED`, `ANYDOC_REVOCATION_CLIENT_ID` → `MORPHYARD_REVOCATION_CLIENT_ID`, `ANYDOC_REVOCATION_CLIENT_SECRET` → `MORPHYARD_REVOCATION_CLIENT_SECRET`, `ANYDOC_REVOCATION_POLL_INTERVAL` → `MORPHYARD_REVOCATION_POLL_INTERVAL`, `ANYDOC_REVOCATION_FAIL_MODE` → `MORPHYARD_REVOCATION_FAIL_MODE`.
 
 ## Key features
 
@@ -29,25 +31,25 @@ sudo apt-get install -y libreoffice-writer libreoffice-calc libreoffice-impress 
 `fonts-noto-cjk` is not optional: without it LibreOffice renders CJK text in PDFs as `□□□` and reports success. Tesseract language packs are not optional either — a missing pack makes Tesseract fail to start rather than degrade.
 
 ```bash
-git clone https://github.com/xianhong1208/AnyDOC_MCP.git
-cd AnyDOC_MCP
+git clone https://github.com/xianhong1208/morphyard.git
+cd morphyard
 uv sync
 ```
 
 Or skip the system packages entirely and use the container, which ships every engine:
 
 ```bash
-docker build -t anydoc .
-docker run -p 5055:5055 -e MCP_GATE_URL=http://mcp-gate:4568 anydoc
+docker build -t morphyard .
+docker run -p 5055:5055 -e MCP_GATE_URL=http://mcp-gate:4568 morphyard
 ```
 
 ## Quick start
 
-### 1. Start MCP Gate and register AnyDoc
+### 1. Start MCP Gate and register Morphyard
 
-Run [MCP Gate](https://github.com/xianhong1208/MCP_Gate) (default `http://localhost:4568`) and register a service pointing at this server: host `127.0.0.1`, port `5055`, path `/mcp`. MCP Gate derives the token audience from that registration (`http://127.0.0.1:5055/mcp`); AnyDoc derives the same value from `ANYDOC_BASE_URL`, so the two only need to agree on host and port.
+Run [MCP Gate](https://github.com/xianhong1208/MCP_Gate) (default `http://localhost:4568`) and register a service pointing at this server: host `127.0.0.1`, port `5055`, path `/mcp`. MCP Gate derives the token audience from that registration (`http://127.0.0.1:5055/mcp`); Morphyard derives the same value from `MORPHYARD_BASE_URL`, so the two only need to agree on host and port.
 
-### 2. Start AnyDoc
+### 2. Start Morphyard
 
 ```bash
 cp .env.example .env          # defaults already point at http://localhost:4568
@@ -62,10 +64,10 @@ Copy the ready-made snippets from the service page in MCP Gate, or by hand:
 
 ```bash
 # Claude Code (OAuth: completes sign-in through MCP Gate on first use)
-claude mcp add --transport http anydoc http://localhost:5055/mcp
+claude mcp add --transport http morphyard http://localhost:5055/mcp
 
 # Any client with a personal access token issued by MCP Gate
-claude mcp add --transport http anydoc http://localhost:5055/mcp \
+claude mcp add --transport http morphyard http://localhost:5055/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
@@ -139,7 +141,7 @@ Everything is in [`config/config.yaml`](config/config.yaml) and reads environmen
 |---|---|---|
 | `SERVER_HOST` / `SERVER_PORT` | `0.0.0.0` / `5055` | Bind address. |
 | `MCP_GATE_URL` | `http://localhost:4568` | The MCP Gate that issues tokens (`auth.issuer`). The pre-rename `MCP_CENTER_URL` is still read when this is unset. |
-| `ANYDOC_BASE_URL` | `http://127.0.0.1:5055` | The address this server is reached at. The token audience is `<ANYDOC_BASE_URL>/mcp` and must equal the service registered in MCP Gate; it also appears in the protected-resource metadata. |
+| `MORPHYARD_BASE_URL` | `http://127.0.0.1:5055` | The address this server is reached at. The token audience is `<MORPHYARD_BASE_URL>/mcp` and must equal the service registered in MCP Gate; it also appears in the protected-resource metadata. |
 | `AUTH_ENABLED` | `true` | Set to `false` only for local experiments. |
 | `MAX_INPUT_MB` | `50` | Per-file limit; also raises the MCP transport body limit (×1.5). |
 | `ENGINE_TIMEOUT` | engine default | Seconds per engine call, applied to every engine. Unset keeps each engine's own limit: LibreOffice 180, Pandoc 120, OCR 300. |
@@ -149,27 +151,27 @@ In the YAML, `auth.required_scopes` lets you demand a scope such as `mcp:tools:i
 
 ### Token revocation
 
-AnyDoc verifies MCP Gate tokens offline, so by default a token revoked in MCP Gate keeps working here until it expires — and a personal access token can live up to a year. Turn on the **revocation feed** and AnyDoc polls MCP Gate's `POST /oauth/revoked` in the background (every `poll_interval_sec`, with jitter and error backoff), keeps the revoked-but-unexpired `jti`s in memory, and answers a listed token on `/mcp` with 401 `invalid_token`. A revocation takes effect within about one poll interval.
+Morphyard verifies MCP Gate tokens offline, so by default a token revoked in MCP Gate keeps working here until it expires — and a personal access token can live up to a year. Turn on the **revocation feed** and Morphyard polls MCP Gate's `POST /oauth/revoked` in the background (every `poll_interval_sec`, with jitter and error backoff), keeps the revoked-but-unexpired `jti`s in memory, and answers a listed token on `/mcp` with 401 `invalid_token`. A revocation takes effect within about one poll interval.
 
 | Variable / setting | Default | Description |
 |---|---|---|
-| `ANYDOC_REVOCATION_ENABLED` (`auth.revocation.enabled`) | `false` | Turn the feed on. Off = nothing is polled. |
-| `ANYDOC_REVOCATION_CLIENT_ID` | — | The resource-server client registered in MCP Gate (below). |
-| `ANYDOC_REVOCATION_CLIENT_SECRET` | — | Its secret. In the YAML it **must** stay an `${ENV_VAR}` reference; a literal value refuses to start. |
-| `ANYDOC_REVOCATION_POLL_INTERVAL` (`poll_interval_sec`) | `30` | Seconds between polls (5–3600). |
-| `ANYDOC_REVOCATION_FAIL_MODE` (`fail_mode`) | `open` | When MCP Gate is unreachable: `open` keeps accepting tokens and logs loudly; `closed` rejects every token once no poll has succeeded for `stale_after_intervals` × `poll_interval_sec` (YAML, default 4), and until the first poll after startup succeeds. |
+| `MORPHYARD_REVOCATION_ENABLED` (`auth.revocation.enabled`) | `false` | Turn the feed on. Off = nothing is polled. |
+| `MORPHYARD_REVOCATION_CLIENT_ID` | — | The resource-server client registered in MCP Gate (below). |
+| `MORPHYARD_REVOCATION_CLIENT_SECRET` | — | Its secret. In the YAML it **must** stay an `${ENV_VAR}` reference; a literal value refuses to start. |
+| `MORPHYARD_REVOCATION_POLL_INTERVAL` (`poll_interval_sec`) | `30` | Seconds between polls (5–3600). |
+| `MORPHYARD_REVOCATION_FAIL_MODE` (`fail_mode`) | `open` | When MCP Gate is unreachable: `open` keeps accepting tokens and logs loudly; `closed` rejects every token once no poll has succeeded for `stale_after_intervals` × `poll_interval_sec` (YAML, default 4), and until the first poll after startup succeeds. |
 
 The first poll fetches the whole list; later polls ask only for revocations since the previous one (with a 30 s overlap), and a full fetch repeats every hour. Entries are dropped once the token would have expired anyway. Startup logs whether the feed is enabled, and `GET /health` reports it under `revocation` (`last_success`, `revoked_count`, `consecutive_failures`, `last_error`, `stale`); a stale feed turns `status` into `degraded`.
 
 **Setting it up** (once per deployment):
 
-1. **Register a confidential client in MCP Gate.** Console → *OAuth Clients* → *Register trusted client*. Name it e.g. `AnyDoc revocation feed`; leave *Redirect URIs* empty; under *Grant types* select only `client_credentials`; *Token endpoint authentication*: **Client secret (POST body)** (HTTP Basic works too — MCP Gate accepts either); *Resource server for*: **AnyDoc**. Register, then copy the `client_id` (`mcpc_…`) and the client secret — the secret is shown once.
-2. **Bind it to AnyDoc** — already done if you picked *Resource server for* in step 1. Otherwise, on the client's row click the server icon (*Resource server…*), choose the AnyDoc service and *Save*; or call `PUT /api/oauth/clients/<client_id>/resource-server` with `{"service_id": "<AnyDoc service id>"}` as a console admin. The row then reads *Resource server for AnyDoc*. The feed lists only tokens whose audience is that service's audience, so it must equal `<ANYDOC_BASE_URL>/mcp`.
-3. **Give AnyDoc the credentials** in its environment (or `.env`), then restart:
+1. **Register a confidential client in MCP Gate.** Console → *OAuth Clients* → *Register trusted client*. Name it e.g. `Morphyard revocation feed`; leave *Redirect URIs* empty; under *Grant types* select only `client_credentials`; *Token endpoint authentication*: **Client secret (POST body)** (HTTP Basic works too — MCP Gate accepts either); *Resource server for*: **Morphyard**. Register, then copy the `client_id` (`mcpc_…`) and the client secret — the secret is shown once.
+2. **Bind it to Morphyard** — already done if you picked *Resource server for* in step 1. Otherwise, on the client's row click the server icon (*Resource server…*), choose the Morphyard service and *Save*; or call `PUT /api/oauth/clients/<client_id>/resource-server` with `{"service_id": "<Morphyard service id>"}` as a console admin. The row then reads *Resource server for Morphyard*. The feed lists only tokens whose audience is that service's audience, so it must equal `<MORPHYARD_BASE_URL>/mcp`.
+3. **Give Morphyard the credentials** in its environment (or `.env`), then restart:
    ```bash
-   ANYDOC_REVOCATION_ENABLED=true
-   ANYDOC_REVOCATION_CLIENT_ID=mcpc_...
-   ANYDOC_REVOCATION_CLIENT_SECRET=...
+   MORPHYARD_REVOCATION_ENABLED=true
+   MORPHYARD_REVOCATION_CLIENT_ID=mcpc_...
+   MORPHYARD_REVOCATION_CLIENT_SECRET=...
    ```
 4. **Check it.** The startup log says `MCP Gate revocation feed: ENABLED …`; `curl -s localhost:5055/health` shows a recent `revocation.last_success`. Revoke a test token in MCP Gate; within `poll_interval_sec` a call to `/mcp` with it gets 401. `HTTP 401: invalid_client` in `last_error` means wrong credentials; `HTTP 403: unauthorized_client` means the client is not bound to a server.
 

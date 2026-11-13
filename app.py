@@ -78,14 +78,14 @@ def _raise_mcp_body_limit(max_input_mb: int) -> None:
     from mcp.server import streamable_http_manager as shm
 
     original = shm.StreamableHTTPSessionManager.__init__
-    if getattr(original, "_anydoc_patched", False):
+    if getattr(original, "_morphyard_patched", False):
         return
 
     def patched(self, *args, **kwargs):
         kwargs.setdefault("max_request_body_size", limit_bytes)
         original(self, *args, **kwargs)
 
-    patched._anydoc_patched = True
+    patched._morphyard_patched = True
     shm.StreamableHTTPSessionManager.__init__ = patched
     api_logger.info(
         f"MCP request body limit raised to {limit_bytes / 1024 / 1024:.0f} MiB "
@@ -100,10 +100,10 @@ def create_app(config: BaseModel, transport: str):
 
     # --- App metadata ---
     app_config = getattr(config, 'app', None)
-    app_name = getattr(app_config, 'name', 'AnyDoc')
+    app_name = getattr(app_config, 'name', 'Morphyard')
     # Always pyproject.toml's version (src/version.py); config's app.version is ignored.
     app_version = get_version()
-    app_title = getattr(app_config, 'title', 'AnyDoc')
+    app_title = getattr(app_config, 'title', 'Morphyard')
     app_description = getattr(app_config, 'description', '')
     instructions = _load_instructions()
 

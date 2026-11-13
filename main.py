@@ -2,7 +2,7 @@
 
 Usage: uv run python main.py --config config/config.yaml
 
-AnyDoc is a stateless conversion service: there is no database and no migration step.
+Morphyard is a stateless conversion service: there is no database and no migration step.
 """
 import argparse
 import sys
@@ -16,7 +16,7 @@ from src.log import get_server_logger, setup_logger
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AnyDoc MCP server",
+        description="Morphyard MCP server",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--config", type=str, default="config/config.yaml", help="Path to the config file")

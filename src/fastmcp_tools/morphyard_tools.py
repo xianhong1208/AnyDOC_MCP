@@ -1,4 +1,4 @@
-"""AnyDoc MCP tools
+"""Morphyard MCP tools
 
 Input contract: file_content (base64) / file_name / mime_type, injected
 automatically by the host application's file-injection (artifact) mechanism.
@@ -167,8 +167,8 @@ def _fidelity_warning(plan) -> str:
     return ""
 
 
-def register_anydoc_tools(mcp: FastMCP):
-    """Register every AnyDoc tool (config.yaml's function_name points here)"""
+def register_morphyard_tools(mcp: FastMCP):
+    """Register every Morphyard tool (config.yaml's function_name points here)"""
 
     # ------------------------------------------------------------------
     # Capability queries
@@ -476,4 +476,4 @@ def register_anydoc_tools(mcp: FastMCP):
             File(data=data, format="pdf", name=f"{source.name}_protected"),
         ]
 
-    logger.info("AnyDoc MCP tools registered")
+    logger.info("Morphyard MCP tools registered")

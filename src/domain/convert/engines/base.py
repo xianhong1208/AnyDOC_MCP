@@ -148,7 +148,7 @@ class Workspace:
         self._dir: Path | None = None
 
     def __enter__(self) -> "Workspace":
-        self._dir = Path(tempfile.mkdtemp(prefix="anydoc_"))
+        self._dir = Path(tempfile.mkdtemp(prefix="morphyard_"))
         return self
 
     def __exit__(self, *exc_info) -> None:

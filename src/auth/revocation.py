@@ -1,6 +1,6 @@
 """MCP Gate revocation feed: reject revoked tokens that still verify offline.
 
-AnyDoc verifies MCP Gate's RS256 tokens offline, so on its own a token revoked in
+Morphyard verifies MCP Gate's RS256 tokens offline, so on its own a token revoked in
 MCP Gate keeps working until it expires (a personal access token can live a year).
 This module closes that gap without introspecting every request:
 
@@ -334,7 +334,7 @@ def build_revocation_list(config, *, issuer: Optional[str],
     if env_refs is not None and "auth.revocation.client_secret" not in env_refs:
         raise RuntimeError(
             "auth.revocation.client_secret must be an ${ENV_VAR} reference, not a literal value "
-            "(e.g. client_secret: \"${ANYDOC_REVOCATION_CLIENT_SECRET}\")")
+            "(e.g. client_secret: \"${MORPHYARD_REVOCATION_CLIENT_SECRET}\")")
     fail_mode = str(getattr(rev, "fail_mode", FAIL_OPEN) or FAIL_OPEN)
     if fail_mode not in (FAIL_OPEN, FAIL_CLOSED):
         raise RuntimeError(f"auth.revocation.fail_mode must be 'open' or 'closed', got {fail_mode!r}")

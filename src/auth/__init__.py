@@ -1,6 +1,6 @@
 """Resource-server side of OAuth 2.1: verify MCP Gate access tokens.
 
-AnyDoc never issues tokens. It trusts one authorization server (MCP Gate), fetches its
+Morphyard never issues tokens. It trusts one authorization server (MCP Gate), fetches its
 JWKS once, and verifies every bearer token offline. FastMCP's `RemoteAuthProvider` also
 publishes `/.well-known/oauth-protected-resource/mcp`, which is how OAuth-capable MCP clients
 discover where to sign in.
