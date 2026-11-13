@@ -32,13 +32,14 @@ conversion against the real engines inside the Docker image.
 **1.2.1 (2026-11-09), safe LibreOffice.** LibreOffice conversions can no longer read local files
 or fetch URLs a document links to, and never run macros.
 
+**1.2.2 (2026-11-13), new name, steady under load.** Renamed from AnyDoc to Morphyard; settings are read from `MORPHYARD_*` variables. LibreOffice profiles are deleted after every conversion, and stale ones are swept at startup. Conversions beyond a set number wait in a queue instead of all running at once.
+
 See [CHANGELOG.md](CHANGELOG.md) for the details.
 
 ## Next
 
 | Version | What you get |
 |---|---|
-| **1.2.2: new name, steady under load** | **Renamed from AnyDoc to Morphyard**; settings are read from `MORPHYARD_*` variables. Leftover LibreOffice profiles are cleaned up, so temporary files no longer pile up. Conversions beyond a set number wait in a queue instead of all running at once. |
 | **1.3: PDF toolkit** | **Merge** PDFs; add a text or image **watermark**; **delete and reorder** pages; **compress**; add **page numbers, a header and a footer**; **unlock** a PDF and set its **permissions**; **read or strip metadata**; turn **PDF pages into images** and **images into a PDF**. |
 | **1.4: bigger jobs** | Results come back as **download links** that expire, instead of large base64 in the reply, so big files no longer flood the model's context. Long conversions run as **jobs with progress**. Files can be given **by URL**, with a guard that refuses internal addresses. **Several files in one call.** A **pipeline** tool chains steps, e.g. merge, then compress, then watermark. |
 | **1.5: web app** | A **page for every tool** in the browser: drop files, pick options, download the result. **Sign-in through MCP Gate**, which can be switched off for use on a trusted LAN. In **English and Traditional Chinese**. |
