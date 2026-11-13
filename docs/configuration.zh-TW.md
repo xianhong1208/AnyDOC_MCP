@@ -7,7 +7,7 @@
 | 變數 | 預設值 | 說明 |
 |---|---|---|
 | `SERVER_HOST` / `SERVER_PORT` | `0.0.0.0` / `5055` | 綁定位址。 |
-| `MCP_GATE_URL` | `http://localhost:4568` | 簽發 token 的 MCP Gate（`auth.issuer`）。未設定時仍會讀取改名前的 `MCP_CENTER_URL`。 |
+| `MCP_GATE_URL` | `http://localhost:4568` | 簽發 token 的 MCP Gate（`auth.issuer`）。 |
 | `MORPHYARD_BASE_URL` | `http://127.0.0.1:5055` | 本伺服器對外的位址。token 的 audience 為 `<MORPHYARD_BASE_URL>/mcp`，必須等於在 MCP Gate 註冊的服務；也會出現在 protected-resource metadata 中。 |
 | `AUTH_ENABLED` | `true` | 只有本機實驗時才設為 `false`。 |
 | `MAX_INPUT_MB` | `50` | 單檔上限；同時提高 MCP 傳輸層的 body 上限（×1.5）。 |
@@ -44,10 +44,11 @@ Morphyard 以離線方式驗證 MCP Gate 的 token，因此預設情況下，在
 
 ## 改名的變數
 
-Morphyard 在 1.2.2 之前叫 AnyDoc。舊的變數名稱不再讀取，升級時請在環境變數或 `.env` 中改名：
+Morphyard 在 1.2.2 之前叫 AnyDoc，MCP Gate 以前叫 MCP Center。舊的變數名稱不再讀取，升級時請在環境變數或 `.env` 中改名：
 
 | 1.2.2 之前 | 現在 |
 |---|---|
+| `MCP_CENTER_URL` | `MCP_GATE_URL` |
 | `ANYDOC_BASE_URL` | `MORPHYARD_BASE_URL` |
 | `ANYDOC_REVOCATION_ENABLED` | `MORPHYARD_REVOCATION_ENABLED` |
 | `ANYDOC_REVOCATION_CLIENT_ID` | `MORPHYARD_REVOCATION_CLIENT_ID` |

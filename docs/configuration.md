@@ -7,7 +7,7 @@ Everything is in [`config/config.yaml`](../config/config.yaml) and reads environ
 | Variable | Default | Description |
 |---|---|---|
 | `SERVER_HOST` / `SERVER_PORT` | `0.0.0.0` / `5055` | Bind address. |
-| `MCP_GATE_URL` | `http://localhost:4568` | The MCP Gate that issues tokens (`auth.issuer`). The pre-rename `MCP_CENTER_URL` is still read when this is unset. |
+| `MCP_GATE_URL` | `http://localhost:4568` | The MCP Gate that issues tokens (`auth.issuer`). |
 | `MORPHYARD_BASE_URL` | `http://127.0.0.1:5055` | The address this server is reached at. The token audience is `<MORPHYARD_BASE_URL>/mcp` and must equal the service registered in MCP Gate; it also appears in the protected-resource metadata. |
 | `AUTH_ENABLED` | `true` | Set to `false` only for local experiments. |
 | `MAX_INPUT_MB` | `50` | Per-file limit; also raises the MCP transport body limit (×1.5). |
@@ -44,10 +44,11 @@ The first poll fetches the whole list; later polls ask only for revocations sinc
 
 ## Renamed variables
 
-Morphyard was called AnyDoc before 1.2.2. The old variable names are no longer read, so rename them in your environment or `.env` when you upgrade:
+Morphyard was called AnyDoc before 1.2.2, and MCP Gate was called MCP Center. The old variable names are no longer read, so rename them in your environment or `.env` when you upgrade:
 
 | Before 1.2.2 | Now |
 |---|---|
+| `MCP_CENTER_URL` | `MCP_GATE_URL` |
 | `ANYDOC_BASE_URL` | `MORPHYARD_BASE_URL` |
 | `ANYDOC_REVOCATION_ENABLED` | `MORPHYARD_REVOCATION_ENABLED` |
 | `ANYDOC_REVOCATION_CLIENT_ID` | `MORPHYARD_REVOCATION_CLIENT_ID` |

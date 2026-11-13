@@ -41,16 +41,15 @@ class TestExpandEnvVars:
         with pytest.raises(ValueError):
             _expand_env_vars("${REQUIRED_VAR}")
 
-    def test_renamed_var_falls_back_to_old_name(self, monkeypatch):
-        """MCP_GATE_URL unset -> the pre-rename MCP_CENTER_URL is still honoured."""
+    def test_pre_rename_mcp_center_url_is_ignored(self, monkeypatch):
+        """MCP_CENTER_URL (MCP Gate's old name) is no longer read: with MCP_GATE_URL unset
+        the default applies, and an explicit MCP_GATE_URL is not overridden by it."""
         monkeypatch.delenv("MCP_GATE_URL", raising=False)
         monkeypatch.setenv("MCP_CENTER_URL", "http://old:4568")
-        assert _expand_env_vars("${MCP_GATE_URL:-http://localhost:4568}") == "http://old:4568"
-
-    def test_renamed_var_wins_over_old_name(self, monkeypatch):
-        """When both are set, the new name wins."""
+        assert _expand_env_vars("${MCP_GATE_URL:-http://localhost:4568}") == "http://localhost:4568"
+        with pytest.raises(ValueError):
+            _expand_env_vars("${MCP_GATE_URL}")
         monkeypatch.setenv("MCP_GATE_URL", "http://new:4568")
-        monkeypatch.setenv("MCP_CENTER_URL", "http://old:4568")
         assert _expand_env_vars("${MCP_GATE_URL:-http://localhost:4568}") == "http://new:4568"
 
 

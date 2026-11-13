@@ -11,6 +11,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 - Renamed from AnyDoc to Morphyard; environment variables are now `MORPHYARD_*` (the `ANYDOC_*` names are no longer read): `MORPHYARD_BASE_URL`, `MORPHYARD_REVOCATION_ENABLED`, `MORPHYARD_REVOCATION_CLIENT_ID`, `MORPHYARD_REVOCATION_CLIENT_SECRET`, `MORPHYARD_REVOCATION_POLL_INTERVAL`, `MORPHYARD_REVOCATION_FAIL_MODE`. The Python project is `morphyard`, MCP serverInfo reports `Morphyard`, and the config section and tool module are `morphyard` / `src.fastmcp_tools.morphyard_tools`. The document → Markdown engine is now reported as `firecrawl` (it was `anydoc`, after the firecrawl-anydoc library it wraps). Port 5055 and the token audience `<base_url>/mcp` are unchanged.
+- `MCP_CENTER_URL`, MCP Gate's name before it was renamed, is no longer read as a fallback for `MCP_GATE_URL`; set `MCP_GATE_URL` instead.
 
 ## [1.2.1] — 2026-11-09
 
