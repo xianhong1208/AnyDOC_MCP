@@ -20,7 +20,7 @@ class ServerConfig(BaseModel):
 class RevocationConfig(BaseModel):
     """MCP Gate's revocation feed (`auth.revocation`).
 
-    AnyDoc verifies tokens offline, so without this a token revoked in MCP Gate keeps
+    Morphyard verifies tokens offline, so without this a token revoked in MCP Gate keeps
     working until it expires. When enabled, a background task polls
     `<issuer>/oauth/revoked` and the /mcp verifier rejects listed tokens. The
     credentials belong to a confidential client registered in the MCP Gate console and
@@ -78,11 +78,19 @@ class ConvertConfig(BaseModel):
     # default: LibreOffice 180, Pandoc 120, OCR 300. A value applies to every engine.
     engine_timeout_sec: Optional[int] = Field(default=None, gt=0)
     max_hops: int = 3
+    # How many conversions run at once (src/domain/convert/limiter.py). None
+    # (MORPHYARD_MAX_CONCURRENT_CONVERSIONS unset) = the CPUs this process may use, at most 8.
+    max_concurrent_conversions: Optional[int] = Field(default=None, gt=0)
+    # How many more may wait for a slot. None = 4 x max_concurrent_conversions; 0 = no queue.
+    max_queued_conversions: Optional[int] = Field(default=None, ge=0)
+    # Longest wait for a slot before the request is refused as busy.
+    queue_timeout_sec: float = Field(default=30, gt=0)
 
-    @field_validator("engine_timeout_sec", mode="before")
+    @field_validator("engine_timeout_sec", "max_concurrent_conversions",
+                     "max_queued_conversions", mode="before")
     @classmethod
-    def _blank_timeout_is_unset(cls, v):
-        # config.yaml writes ${ENGINE_TIMEOUT:-}, which arrives as "" when the variable is unset
+    def _blank_is_unset(cls, v):
+        # config.yaml writes ${ENGINE_TIMEOUT:-} and the like, which arrive as "" when unset
         return None if v is None or (isinstance(v, str) and not v.strip()) else v
 
 

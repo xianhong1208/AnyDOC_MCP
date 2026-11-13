@@ -46,16 +46,16 @@ ALL_FORMATS = (
 # Macro-enabled variants (docm / xlsm / pptm) and the slideshow variant (ppsx)
 # collapse onto their base format here. They share the same ZIP+XML container;
 # the only differences are an extra VBA project and a different content-type,
-# and every engine (anydoc, LibreOffice) detects the format from content anyway.
+# and every engine (firecrawl, LibreOffice) detects the format from content anyway.
 # Verified: .docm and .xlsm both parse fine. Collapsing them here means we do
 # not have to duplicate a full set of routes per variant.
 #
 # .xlsb is also folded in here, but on different grounds, which deserve a note:
 #
-# An earlier test with a synthetic BIFF12 container was rejected by anydoc with
+# An earlier test with a synthetic BIFF12 container was rejected by firecrawl with
 # MalformedError, and I concluded xlsb was unsupported. That conclusion was
 # wrong: the synthetic file was not a valid xlsb to begin with, so rejecting it
-# was correct behaviour. Reading anydoc's source settled it: the doc comment on
+# was correct behaviour. Reading firecrawl's source settled it: the doc comment on
 # Format::Excel explicitly says "every container calamine reads: .xlsx, .xlsm,
 # .xlsb, and binary .xls", and calamine does support BIFF12.
 #
@@ -299,7 +299,7 @@ def _sniff_zip(data: bytes) -> str | None:
             for prefix, fmt in _ZIP_PART_PREFIXES:
                 if any(n.startswith(prefix) for n in name_set):
                     # XLSB stores BIFF12 binary rather than XML but still lives
-                    # under xl/. anydoc reads it via calamine, so it is reported
+                    # under xl/. firecrawl reads it via calamine, so it is reported
                     # as xlsx too (shared internal code; every engine detects the
                     # real format from content).
                     return fmt
@@ -346,7 +346,7 @@ def _sniff_ole(data: bytes) -> str | None:
 
     **Matching must be case-insensitive.** The CFB spec itself compares names
     after upper-casing, and producers are inconsistent in practice (`Workbook` /
-    `WORKBOOK` / `Book`). anydoc's detect.rs uses `eq_ignore_ascii_case` for
+    `WORKBOOK` / `Book`). firecrawl's detect.rs uses `eq_ignore_ascii_case` for
     this and explicitly notes "producers vary"; this mirrors that approach.
     """
     regions = [_read_ole_directory(data)]
@@ -413,7 +413,7 @@ def detect_format(
 
         # A PDF header may be preceded by junk: ISO 32000 does not require %PDF-
         # at offset 0 and real readers accept it. Scanning the first 1024 bytes
-        # is what anydoc does; mirrored here. With startswith alone, a PDF with a
+        # is what firecrawl does; mirrored here. With startswith alone, a PDF with a
         # BOM or leading whitespace would fail detection.
         if b"%PDF-" in data[:_PDF_HEADER_SCAN_BYTES]:
             return "pdf"

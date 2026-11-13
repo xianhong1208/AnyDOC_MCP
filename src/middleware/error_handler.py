@@ -36,4 +36,8 @@ def register_error_handlers(app: FastAPI):
         else:
             logger.warning(f"[{exc.error_code}] {exc.message} | path={request.url.path}")
 
-        return JSONResponse(status_code=status_code, content=response_body)
+        headers = {}
+        retry_after = exc.details.get("retry_after_sec")
+        if retry_after is not None:
+            headers["Retry-After"] = str(int(retry_after))
+        return JSONResponse(status_code=status_code, content=response_body, headers=headers)

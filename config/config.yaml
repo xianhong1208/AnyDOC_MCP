@@ -1,5 +1,5 @@
 # =============================================================================
-# AnyDoc configuration
+# Morphyard configuration
 #
 # Values may reference environment variables:
 #   ${VAR}           required - startup fails when it is unset
@@ -18,17 +18,17 @@ server:
 auth:
   enabled: ${AUTH_ENABLED:-true}
   issuer: "${MCP_GATE_URL:-http://localhost:4568}"
-  base_url: "${ANYDOC_BASE_URL:-http://127.0.0.1:5055}"
+  base_url: "${MORPHYARD_BASE_URL:-http://127.0.0.1:5055}"
   required_scopes: []
   # MCP Gate revocation feed: without it a token revoked in MCP Gate keeps working here
   # until it expires. Needs a confidential client bound to this server in MCP Gate
-  # (README -> "Token revocation"). The secret must stay an ${ENV_VAR} reference.
+  # (docs/configuration.md -> "Token revocation"). The secret must stay an ${ENV_VAR} reference.
   revocation:
-    enabled: ${ANYDOC_REVOCATION_ENABLED:-false}
-    client_id: "${ANYDOC_REVOCATION_CLIENT_ID:-}"
-    client_secret: "${ANYDOC_REVOCATION_CLIENT_SECRET:-}"
-    poll_interval_sec: ${ANYDOC_REVOCATION_POLL_INTERVAL:-30}   # a revocation takes effect within about this long
-    fail_mode: "${ANYDOC_REVOCATION_FAIL_MODE:-open}"          # open | closed (reject all tokens when the feed is stale)
+    enabled: ${MORPHYARD_REVOCATION_ENABLED:-false}
+    client_id: "${MORPHYARD_REVOCATION_CLIENT_ID:-}"
+    client_secret: "${MORPHYARD_REVOCATION_CLIENT_SECRET:-}"
+    poll_interval_sec: ${MORPHYARD_REVOCATION_POLL_INTERVAL:-30}   # a revocation takes effect within about this long
+    fail_mode: "${MORPHYARD_REVOCATION_FAIL_MODE:-open}"          # open | closed (reject all tokens when the feed is stale)
     stale_after_intervals: 4                                   # "stale" = no successful poll for 4 x poll_interval_sec
 
 logging:
@@ -39,20 +39,25 @@ logging:
   backup_count: 3
 
 app:
-  name: "AnyDoc"
-  title: "AnyDoc"
+  name: "Morphyard"
+  title: "Morphyard"
   description: "Document conversion MCP server: Office, PDF, Markdown, HTML, spreadsheets, presentations and images, plus PDF split / extract / rotate / encrypt."
 
 convert:
   max_input_mb: ${MAX_INPUT_MB:-50}         # per-file limit
   engine_timeout_sec: ${ENGINE_TIMEOUT:-}    # seconds per engine call; empty = each engine's default (LibreOffice 180, Pandoc 120, OCR 300)
   max_hops: 3                               # longest multi-hop conversion path (overrides registry.MAX_HOPS)
+  # Conversions beyond the limit wait in a first-in, first-out queue; when it is full, or a request
+  # has waited queue_timeout_sec, it is refused as busy (MCP tool error; HTTP 503 + Retry-After).
+  max_concurrent_conversions: ${MORPHYARD_MAX_CONCURRENT_CONVERSIONS:-}   # empty = CPUs available, at most 8
+  max_queued_conversions: ${MORPHYARD_MAX_QUEUED_CONVERSIONS:-}           # empty = 4 x the limit; 0 = no queue
+  queue_timeout_sec: ${MORPHYARD_QUEUE_TIMEOUT:-30}                       # longest wait for a slot, seconds
 
 modules:
   enabled:
-    - anydoc
+    - morphyard
 
-  anydoc:
+  morphyard:
     mcp_tools:
-      module: "src.fastmcp_tools.anydoc_tools"
-      function_name: "register_anydoc_tools"
+      module: "src.fastmcp_tools.morphyard_tools"
+      function_name: "register_morphyard_tools"

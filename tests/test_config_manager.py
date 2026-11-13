@@ -41,16 +41,15 @@ class TestExpandEnvVars:
         with pytest.raises(ValueError):
             _expand_env_vars("${REQUIRED_VAR}")
 
-    def test_renamed_var_falls_back_to_old_name(self, monkeypatch):
-        """MCP_GATE_URL unset -> the pre-rename MCP_CENTER_URL is still honoured."""
+    def test_pre_rename_mcp_center_url_is_ignored(self, monkeypatch):
+        """MCP_CENTER_URL (MCP Gate's old name) is no longer read: with MCP_GATE_URL unset
+        the default applies, and an explicit MCP_GATE_URL is not overridden by it."""
         monkeypatch.delenv("MCP_GATE_URL", raising=False)
         monkeypatch.setenv("MCP_CENTER_URL", "http://old:4568")
-        assert _expand_env_vars("${MCP_GATE_URL:-http://localhost:4568}") == "http://old:4568"
-
-    def test_renamed_var_wins_over_old_name(self, monkeypatch):
-        """When both are set, the new name wins."""
+        assert _expand_env_vars("${MCP_GATE_URL:-http://localhost:4568}") == "http://localhost:4568"
+        with pytest.raises(ValueError):
+            _expand_env_vars("${MCP_GATE_URL}")
         monkeypatch.setenv("MCP_GATE_URL", "http://new:4568")
-        monkeypatch.setenv("MCP_CENTER_URL", "http://old:4568")
         assert _expand_env_vars("${MCP_GATE_URL:-http://localhost:4568}") == "http://new:4568"
 
 
@@ -108,3 +107,55 @@ class TestConvertConfigIsWired:
         )
         _raise_mcp_body_limit(MAX_INPUT_MB)  # must be idempotent when called twice
         _raise_mcp_body_limit(MAX_INPUT_MB)
+
+
+class TestMorphyardEnvNames:
+    """The shipped config reads MORPHYARD_* only; the pre-rename ANYDOC_* names are ignored."""
+
+    OLD_TO_NEW = {
+        "ANYDOC_BASE_URL": "MORPHYARD_BASE_URL",
+        "ANYDOC_REVOCATION_ENABLED": "MORPHYARD_REVOCATION_ENABLED",
+        "ANYDOC_REVOCATION_CLIENT_ID": "MORPHYARD_REVOCATION_CLIENT_ID",
+        "ANYDOC_REVOCATION_CLIENT_SECRET": "MORPHYARD_REVOCATION_CLIENT_SECRET",
+        "ANYDOC_REVOCATION_POLL_INTERVAL": "MORPHYARD_REVOCATION_POLL_INTERVAL",
+        "ANYDOC_REVOCATION_FAIL_MODE": "MORPHYARD_REVOCATION_FAIL_MODE",
+    }
+
+    @staticmethod
+    def _shipped_config():
+        from pathlib import Path
+
+        import yaml
+
+        path = Path(__file__).resolve().parent.parent / "config" / "config.yaml"
+        return _expand_env_vars(yaml.safe_load(path.read_text(encoding="utf-8")))
+
+    def test_config_names_only_morphyard_vars(self):
+        """Every renamed variable appears in config.yaml under its new name and never the old one."""
+        from pathlib import Path
+
+        text = (Path(__file__).resolve().parent.parent / "config" / "config.yaml").read_text()
+        assert "ANYDOC_" not in text
+        for new in self.OLD_TO_NEW.values():
+            assert "${" + new in text
+
+    def test_morphyard_vars_are_read(self, monkeypatch):
+        for old in self.OLD_TO_NEW:
+            monkeypatch.delenv(old, raising=False)
+        monkeypatch.setenv("MORPHYARD_BASE_URL", "http://new.example:5055")
+        monkeypatch.setenv("MORPHYARD_REVOCATION_FAIL_MODE", "closed")
+        cfg = self._shipped_config()
+        assert cfg["auth"]["base_url"] == "http://new.example:5055"
+        assert cfg["auth"]["revocation"]["fail_mode"] == "closed"
+
+    def test_old_anydoc_vars_are_ignored(self, monkeypatch):
+        """With only the old names set, the defaults apply (no legacy fallback)."""
+        for old, new in self.OLD_TO_NEW.items():
+            monkeypatch.delenv(new, raising=False)
+        monkeypatch.setenv("ANYDOC_BASE_URL", "http://old.example:5055")
+        monkeypatch.setenv("ANYDOC_REVOCATION_FAIL_MODE", "closed")
+        monkeypatch.setenv("ANYDOC_REVOCATION_POLL_INTERVAL", "99")
+        cfg = self._shipped_config()
+        assert cfg["auth"]["base_url"] == "http://127.0.0.1:5055"
+        assert cfg["auth"]["revocation"]["fail_mode"] == "open"
+        assert str(cfg["auth"]["revocation"]["poll_interval_sec"]) == "30"

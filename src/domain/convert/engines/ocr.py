@@ -1,6 +1,6 @@
 """Tesseract OCR engine: text recognition for images and scanned PDFs
 
-Why it is needed: anydoc, the text-extraction engine, does not read images at
+Why it is needed: firecrawl, the text-extraction engine, does not read images at
 all, and it rejects scanned PDFs because their pages are images with no text
 layer. Both inputs are extremely common in business settings (scanned
 contracts, photographed forms); without OCR the whole path is a dead end.

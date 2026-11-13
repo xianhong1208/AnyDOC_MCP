@@ -65,7 +65,7 @@ class TestDirectRoutes:
     def test_pdf_to_markdown_is_marked_lossy(self):
         """Extracting text from PDF is always lossy; plan_conversion decides on this flag."""
         route = DIRECT_ROUTES[("pdf", "md")]
-        assert route.engine == "anydoc"
+        assert route.engine == "firecrawl"
         assert route.fidelity == FIDELITY_LOSSY
 
     def test_no_direct_path_for_markdown_to_pdf(self):
@@ -79,10 +79,10 @@ class TestDirectRoutes:
         assert DIRECT_ROUTES[("png", "jpg")].engine == "pillow"
         assert DIRECT_ROUTES[("png", "jpg")].fidelity == FIDELITY_HIGH
 
-    def test_image_to_text_uses_ocr_not_anydoc(self):
+    def test_image_to_text_uses_ocr_not_firecrawl(self):
         """Text from images must go through OCR.
 
-        anydoc does not handle images at all; the previously used MarkItDown relied
+        firecrawl does not handle images at all; the previously used MarkItDown relied
         on LLM image descriptions rather than OCR and returned only EXIF metadata
         without an llm_client. Neither can extract text from images. This test
         guards "the routing table must not claim capabilities it does not have".
@@ -90,9 +90,9 @@ class TestDirectRoutes:
         for fmt in ("png", "jpg", "tiff"):
             assert DIRECT_ROUTES[(fmt, "md")].engine == "ocr"
 
-    def test_pdf_to_markdown_prefers_anydoc_over_ocr(self):
-        """A PDF with a text layer only needs anydoc; OCR is the fallback when no text comes out."""
-        assert DIRECT_ROUTES[("pdf", "md")].engine == "anydoc"
+    def test_pdf_to_markdown_prefers_firecrawl_over_ocr(self):
+        """A PDF with a text layer only needs firecrawl; OCR is the fallback when no text comes out."""
+        assert DIRECT_ROUTES[("pdf", "md")].engine == "firecrawl"
 
 
 class TestResolveFormats:
@@ -140,7 +140,7 @@ class TestPlanConversion:
         assert plan[0].engine == "pandoc"
 
     def test_lossy_path_refused_by_default(self, all_engines_available):
-        """pdf -> docx only goes through anydoc; by default refuse rather than emit a bad file."""
+        """pdf -> docx only goes through firecrawl; by default refuse rather than emit a bad file."""
         with pytest.raises(NoConversionPathError) as exc:
             plan_conversion("pdf", "docx", prefer_fidelity=True)
         # The message must tell the AI where the escape hatch is, or it just

@@ -11,7 +11,9 @@ right command line.
 """
 
 import asyncio
+import os
 import shutil
+import signal
 import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -24,6 +26,8 @@ from src.log import get_mcptools_logger
 logger = get_mcptools_logger()
 
 DEFAULT_TIMEOUT_SEC = 120
+
+_POSIX = os.name == "posix"
 
 # convert.engine_timeout_sec (ENGINE_TIMEOUT), set at startup by app._apply_convert_config.
 # None keeps each engine's own default.
@@ -103,6 +107,11 @@ class CliEngine(ConversionEngine):
         restarts.
         """
         logger.debug(f"[{self.name}] exec: {' '.join(argv)}")
+        # Its own process group, so a timeout or a cancelled request can kill
+        # everything it started: `soffice` is a shell script that runs oosplash,
+        # which runs soffice.bin, and killing only the first leaves the others
+        # running (and holding their LibreOffice profile).
+        group = {"process_group": 0} if _POSIX else {}
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
@@ -110,6 +119,7 @@ class CliEngine(ConversionEngine):
                 env=env,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                **group,
             )
         except FileNotFoundError:
             raise ConversionFailedError(
@@ -120,11 +130,15 @@ class CliEngine(ConversionEngine):
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except TimeoutError:
-            proc.kill()
-            await proc.wait()
+            await _kill_process_group(proc)
             raise ConversionFailedError(
                 self.name, src, dst, f"timed out after {timeout}s",
             )
+        except BaseException:
+            # The request was cancelled (client gone, server shutting down):
+            # the engine must not outlive it.
+            await _kill_process_group(proc)
+            raise
 
         if proc.returncode != 0:
             detail = (stderr or b"").decode("utf-8", errors="replace").strip()
@@ -132,6 +146,27 @@ class CliEngine(ConversionEngine):
                 self.name, src, dst,
                 detail[:500] or f"exit code {proc.returncode}",
             )
+
+
+async def _kill_process_group(proc: asyncio.subprocess.Process) -> None:
+    """Kill a still-running engine process and everything in its process group, then reap it.
+
+    Safe from killing a stranger: the group id is the leader's pid, and the leader
+    has not been reaped yet, so that pid cannot have been reused.
+    """
+    if proc.returncode is None:
+        try:
+            if _POSIX:
+                os.killpg(proc.pid, signal.SIGKILL)
+            else:
+                proc.kill()
+        except ProcessLookupError:
+            pass
+    try:
+        await asyncio.shield(proc.wait())
+    except asyncio.CancelledError:
+        # Cancelled again while reaping: the process is already killed.
+        pass
 
 
 class Workspace:
@@ -148,7 +183,7 @@ class Workspace:
         self._dir: Path | None = None
 
     def __enter__(self) -> "Workspace":
-        self._dir = Path(tempfile.mkdtemp(prefix="anydoc_"))
+        self._dir = Path(tempfile.mkdtemp(prefix="morphyard_"))
         return self
 
     def __exit__(self, *exc_info) -> None:

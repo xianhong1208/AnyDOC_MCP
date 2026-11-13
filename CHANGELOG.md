@@ -1,10 +1,25 @@
 # Changelog
 
-All notable changes to AnyDoc are documented here. The format is based on
+All notable changes to Morphyard (formerly AnyDoc) are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.2.2] — 2026-11-13
+
+### Changed
+- Renamed from AnyDoc to Morphyard; environment variables are now `MORPHYARD_*` (the `ANYDOC_*` names are no longer read): `MORPHYARD_BASE_URL`, `MORPHYARD_REVOCATION_ENABLED`, `MORPHYARD_REVOCATION_CLIENT_ID`, `MORPHYARD_REVOCATION_CLIENT_SECRET`, `MORPHYARD_REVOCATION_POLL_INTERVAL`, `MORPHYARD_REVOCATION_FAIL_MODE`. The Python project is `morphyard`, MCP serverInfo reports `Morphyard`, and the config section and tool module are `morphyard` / `src.fastmcp_tools.morphyard_tools`. The document → Markdown engine is now reported as `firecrawl` (it was `anydoc`, after the firecrawl-anydoc library it wraps). Port 5055 and the token audience `<base_url>/mcp` are unchanged.
+- `MCP_CENTER_URL`, MCP Gate's name before it was renamed, is no longer read as a fallback for `MCP_GATE_URL`; set `MCP_GATE_URL` instead.
+
+### Added
+- A limit on concurrent conversions, with a queue (#23). There was none: every request started its engine at once, so a burst of uploads meant that many soffice processes competing for the same CPU and memory. Now at most `MORPHYARD_MAX_CONCURRENT_CONVERSIONS` conversions run at once (default: the CPUs the process may use, at most 8), across all engines together; a request holds one slot for its whole run, every hop included. Up to `MORPHYARD_MAX_QUEUED_CONVERSIONS` more (default 4 × the limit; `0` = no queue) wait first-in, first-out for up to `MORPHYARD_QUEUE_TIMEOUT` seconds (default 30). Past that a tool answers with an MCP tool error saying the server is busy, that nothing was started and to retry the same call shortly (`server_busy`, HTTP 503 with `Retry-After` if raised behind a REST route). Requests are validated before they queue, so a bad request is still answered at once. `GET /health` reports `conversions`: running, queued and the limits. `list_supported_conversions` and `inspect_document` take no slot.
+
+### Fixed
+- LibreOffice conversions no longer leave their profile behind (#22). Every conversion ran with a profile `lo_profile_<pid>_<n>` in the temp directory that was never deleted, so they piled up (about 900 on one server). Each conversion now creates its profile with `mkdtemp` (private, mode 0700, a name never reused, so a restarted container no longer reuses an old profile) and deletes it when the conversion ends: success, failure, timeout or a cancelled request. Before deleting it, nothing may still run with it: every engine now runs in its own process group, and a timeout or a cancelled request kills the whole group (killing only `soffice` left `soffice.bin` running), and soffice's own temp files (`lu….tmp`, left when it is killed) go into the profile. At startup the server removes stale profiles from earlier runs: only directories owned by its own user, untouched for an hour, not locked by a running conversion and not used by any running process, so other workers or servers sharing the temp directory keep theirs. The hardened profile settings from 1.2.1 are unchanged.
+
+### Docs
+- Docs: roadmap and README rewritten. A new `ROADMAP.md` / `ROADMAP.zh-TW.md` lists what shipped and the plan to 1.8, with a GitHub milestone per version. Both READMEs follow a shorter layout (badges, an example tool call from a real run, quick start, deployment options); the tool and format tables, known limits, configuration (with the renamed variables) and revocation-feed setup, and testing moved to `docs/tools`, `docs/configuration` and `docs/development` (English and Traditional Chinese). The local-experiment command no longer points at a `config/config.test.yaml` that does not exist.
 
 ## [1.2.1] — 2026-11-09
 
@@ -49,9 +64,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 First release: a document conversion MCP server (Office ↔ PDF, Markdown ↔ Word, spreadsheets, presentations, images, OCR, PDF split / extract / rotate / encrypt) secured by MCP Gate OAuth 2.1.
 
-[Unreleased]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.2.1...dev
-[1.2.1]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.2.0...v1.2.1
-[1.2.0]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.1...v1.2.0
-[1.1.1]: https://github.com/xianhong1208/AnyDOC_MCP/compare/v1.1.0...v1.1.1
-[1.1.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.1.0
-[1.0.0]: https://github.com/xianhong1208/AnyDOC_MCP/releases/tag/v1.0.0
+[Unreleased]: https://github.com/xianhong1208/morphyard/compare/v1.2.2...dev
+[1.2.2]: https://github.com/xianhong1208/morphyard/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/xianhong1208/morphyard/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/xianhong1208/morphyard/compare/v1.1.1...v1.2.0
+[1.1.1]: https://github.com/xianhong1208/morphyard/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/xianhong1208/morphyard/releases/tag/v1.1.0
+[1.0.0]: https://github.com/xianhong1208/morphyard/releases/tag/v1.0.0

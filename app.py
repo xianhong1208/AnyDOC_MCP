@@ -43,16 +43,39 @@ def _apply_convert_config(config: BaseModel) -> None:
     if convert is None:
         return
 
-    from src.domain.convert import registry, service
+    from src.domain.convert import limiter, registry, service
     from src.domain.convert.engines import base
 
     service.MAX_INPUT_MB = convert.max_input_mb
     registry.MAX_HOPS = convert.max_hops
     base.ENGINE_TIMEOUT_SEC = convert.engine_timeout_sec
+    slots = limiter.configure(
+        convert.max_concurrent_conversions,
+        convert.max_queued_conversions,
+        convert.queue_timeout_sec,
+    )
     api_logger.info(
         f"Convert config: max_input={convert.max_input_mb}MB, "
-        f"max_hops={convert.max_hops}, engine_timeout={f'{convert.engine_timeout_sec}s' if convert.engine_timeout_sec else 'engine defaults'}"
+        f"max_hops={convert.max_hops}, engine_timeout={f'{convert.engine_timeout_sec}s' if convert.engine_timeout_sec else 'engine defaults'}, "
+        f"concurrent={slots.max_concurrent}, queued={slots.max_queued}, "
+        f"queue_timeout={slots.queue_timeout_sec:g}s"
     )
+
+
+async def _sweep_stale_libreoffice_profiles() -> None:
+    """Remove LibreOffice profiles that earlier runs left in the temp directory.
+
+    Each conversion deletes its own profile; this catches what a crash, a kill -9 or a
+    version before 1.2.2 left behind. Never fatal: a failed sweep only means leftovers.
+    """
+    import asyncio
+
+    from src.domain.convert.engines.libreoffice import sweep_stale_profiles
+
+    try:
+        await asyncio.to_thread(sweep_stale_profiles)
+    except Exception as e:  # pragma: no cover - defensive
+        api_logger.warning(f"Could not sweep stale LibreOffice profiles: {e}")
 
 
 def _raise_mcp_body_limit(max_input_mb: int) -> None:
@@ -78,14 +101,14 @@ def _raise_mcp_body_limit(max_input_mb: int) -> None:
     from mcp.server import streamable_http_manager as shm
 
     original = shm.StreamableHTTPSessionManager.__init__
-    if getattr(original, "_anydoc_patched", False):
+    if getattr(original, "_morphyard_patched", False):
         return
 
     def patched(self, *args, **kwargs):
         kwargs.setdefault("max_request_body_size", limit_bytes)
         original(self, *args, **kwargs)
 
-    patched._anydoc_patched = True
+    patched._morphyard_patched = True
     shm.StreamableHTTPSessionManager.__init__ = patched
     api_logger.info(
         f"MCP request body limit raised to {limit_bytes / 1024 / 1024:.0f} MiB "
@@ -100,10 +123,10 @@ def create_app(config: BaseModel, transport: str):
 
     # --- App metadata ---
     app_config = getattr(config, 'app', None)
-    app_name = getattr(app_config, 'name', 'AnyDoc')
+    app_name = getattr(app_config, 'name', 'Morphyard')
     # Always pyproject.toml's version (src/version.py); config's app.version is ignored.
     app_version = get_version()
-    app_title = getattr(app_config, 'title', 'AnyDoc')
+    app_title = getattr(app_config, 'title', 'Morphyard')
     app_description = getattr(app_config, 'description', '')
     instructions = _load_instructions()
 
@@ -123,6 +146,7 @@ def create_app(config: BaseModel, transport: str):
 
     @asynccontextmanager
     async def lifespan(app):
+        await _sweep_stale_libreoffice_profiles()
         async with mcp_app.lifespan(app):
             async with revocation_lifespan():
                 yield

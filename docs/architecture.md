@@ -1,6 +1,6 @@
-# AnyDoc architecture
+# Morphyard architecture
 
-This document describes how AnyDoc is built: the module layout, the conversion engines and the fidelity model that selects between them, the input/output contract that MCP tools expose, format detection, conversion planning, the test layers, and the limits that follow from these choices. For installation and configuration see the [README](../README.md).
+This document describes how Morphyard is built: the module layout, the conversion engines and the fidelity model that selects between them, the input/output contract that MCP tools expose, format detection, conversion planning, the test layers, and the limits that follow from these choices. For installation see the [README](../README.md); for settings, [configuration.md](configuration.md).
 
 ## Module layout
 
@@ -16,13 +16,13 @@ src/
 │       ├── discovery.py      Cross-platform executable lookup (PATH plus known install locations)
 │       ├── libreoffice.py    Office ↔ PDF, layout fidelity
 │       ├── pandoc.py         Text formats, structural fidelity
-│       ├── anydoc_engine.py  Document → Markdown (firecrawl-anydoc)
+│       ├── firecrawl_engine.py  Document → Markdown (firecrawl-anydoc)
 │       ├── ocr.py            Image / scanned PDF → text (Tesseract)
 │       ├── image.py          Image ↔ image (Pillow)
 │       └── text.py           JSON / XML / TSV → Markdown
 ├── auth/                   OAuth 2.1 resource-server wiring (JWKS verification, revocation feed)
 └── fastmcp_tools/
-    └── anydoc_tools.py     MCP tool layer
+    └── morphyard_tools.py     MCP tool layer
 ```
 
 Dependencies point strictly downward. The tool layer never touches base64 payloads or engines; it talks only to `service.py`. `registry.py` is the single place that declares what the service can do: every route the capability matrix advertises is a row in its table, and `plan_conversion()` consults nothing else.
@@ -36,11 +36,13 @@ Six engines, each with a fixed fidelity level. Fidelity is not a descriptive lab
 | LibreOffice | `high` | Layout, fonts, positions | Office ↔ PDF; any conversion that must "look the same" |
 | Pillow | `high` | Pixels | Image format conversion, resizing, compression |
 | Pandoc | `structural` | Heading hierarchy, lists, table structure | Semantic conversion between Markdown / HTML / Word / PPTX |
-| anydoc | `lossy` | Text and tables only | Extracting PDF, Excel, PowerPoint and EPUB content for a model to read |
+| firecrawl | `lossy` | Text and tables only | Extracting PDF, Excel, PowerPoint and EPUB content for a model to read |
 | Tesseract | `lossy` | Text only | OCR of images and scanned PDFs |
 | TextEngine | `lossy` | Raw text | Lightweight wrapping of JSON / XML / TSV |
 
 **Untrusted documents and LibreOffice.** LibreOffice loads what a document links to while opening it, so `libreoffice.py` writes a `registrymodifications.xcu` into each conversion's fresh profile: `BlockUntrustedRefererLinks` on (no trusted locations are configured), every HTTP/HTTPS/FTP request routed to the unreachable proxy `proxy.invalid` (and the same as `*_proxy` in soffice's environment, with `no_proxy` removed), link updates off, macros off. The block is not honoured everywhere: Calc and Impress load ODF images linked by path, and the RTF importer reads `INCLUDEPICTURE` files. `external_refs.py` therefore removes outside references before soffice runs, chosen by content because soffice detects the type itself (an ODP named `.pptx` is opened as ODP): every zip has its `.rels` parts rebuilt without external non-hyperlink relationships and its XML parts cut free of `xlink:href` / `xml:base` / `form:image-data` values that do not resolve inside the package (byte-level cuts, because ODF formulas use namespace prefixes inside attribute values that a re-serialiser would drop); anything with `\fldinst` has its linking field instructions emptied. Binary `doc` / `xls` / `ppt` cannot be rewritten; the profile's block is what stops their links, verified with linked images in each. A package that cannot be parsed is refused, since LibreOffice repairs zips and reads XML this parser rejects. `tests/test_libreoffice_isolation.py` holds the probes.
+
+**LibreOffice profiles do not pile up.** A profile cannot be shared by two soffice processes, so every conversion creates its own with `mkdtemp` (`lo_profile_<pid>_<random>`, mode 0700, in the temp directory) and deletes it in a `finally`, whether the conversion succeeded, failed, timed out or was cancelled. Before the profile goes, the engine makes sure nothing still runs with it: `_run_command` starts each engine in its own process group and kills the whole group on a timeout or a cancelled request (`soffice` is a shell script that starts `oosplash`, which starts `soffice.bin`), and the profile's teardown kills any process whose command line names it. soffice's own temp files (`lu….tmp`, left behind when it is killed) go into the profile too, through `TMPDIR`. At startup the app sweeps leftovers from crashes or versions before 1.2.2 (`sweep_stale_profiles`): a `lo_profile_*` directory is removed only if it is a real directory owned by the server's user, untouched for an hour, not locked (each conversion holds an `flock` on a file in its profile, released by the kernel when the holder dies) and not named on any running process's command line, so other workers and other servers sharing the temp directory keep theirs. `tests/test_libreoffice_profiles.py` covers it.
 
 Engine availability is probed once at startup. A missing `pandoc` or `soffice` does not prevent the server from starting; it removes the corresponding routes from the capability matrix. `discovery.py` looks beyond `PATH` because on Windows LibreOffice, Tesseract and Pandoc install to fixed directories that are not added to `PATH`; without this layer four of the six engines report as unavailable on a machine where they are installed.
 
@@ -50,9 +52,9 @@ The document → Markdown slot originally used Microsoft MarkItDown. It was repl
 
 | Format | Speed | Quality |
 |---|---|---|
-| docx | 22× faster | anydoc keeps `> blockquote` and `[^1]` footnote syntax; MarkItDown loses both |
+| docx | 22× faster | firecrawl keeps `> blockquote` and `[^1]` footnote syntax; MarkItDown loses both |
 | xlsx | 86× faster | Equivalent |
-| pptx | 17× faster | anydoc keeps `**bold**`; MarkItDown flattens to plain text |
+| pptx | 17× faster | firecrawl keeps `**bold**`; MarkItDown flattens to plain text |
 | epub | 17× faster | MarkItDown injects metadata noise such as `**Language:** C` |
 | pdf | 2× faster | Equivalent |
 
@@ -60,13 +62,13 @@ The dependency footprint differs more than the speed: `markitdown[all]` pulls in
 
 ### Intermediate-format choices
 
-- **`epub → md` is routed through anydoc explicitly.** Pandoc's EPUB reader emits internal anchors such as `<span id="ch001.xhtml">`, which are pure noise for a model.
+- **`epub → md` is routed through firecrawl explicitly.** Pandoc's EPUB reader emits internal anchors such as `<span id="ch001.xhtml">`, which are pure noise for a model.
 - **`docx → md` and `odt → md` stay on Pandoc.** Its output is equally clean, and because the route is `structural` (reversible) rather than `lossy`, it is a better intermediate for multi-hop paths.
-- **anydoc does not process images.** Images always go to Tesseract.
+- **firecrawl does not process images.** Images always go to Tesseract.
 
 ### Scanned-PDF fallback
 
-When anydoc meets a PDF without a text layer it raises `UnsupportedError: ... OCR is required`. The service catches this and hands the file to the OCR engine: `pdftoppm` rasterises pages to PNG at 150 DPI (`RASTER_DPI`), Tesseract recognises each page, and output stops at `MAX_OCR_PAGES = 30` with an explicit truncation notice in the returned text.
+When firecrawl meets a PDF without a text layer it raises `UnsupportedError: ... OCR is required`. The service catches this and hands the file to the OCR engine: `pdftoppm` rasterises pages to PNG at 150 DPI (`RASTER_DPI`), Tesseract recognises each page, and output stops at `MAX_OCR_PAGES = 30` with an explicit truncation notice in the returned text.
 
 ## Input / output contract
 
@@ -90,7 +92,7 @@ Tools that return a list must be declared with `@mcp.tool(output_schema=None)`. 
 
 ### Hosts that inject uploaded files (artifact injection)
 
-Some MCP hosts manage file uploads on the user's behalf. The model receives a placeholder reference such as `[Uploaded Artifact: "report.docx"]`, and a host-side plugin resolves that reference to bytes before the tool is called. AnyDoc is written to survive the injection behaviour observed in such hosts, which is not intuitive:
+Some MCP hosts manage file uploads on the user's behalf. The model receives a placeholder reference such as `[Uploaded Artifact: "report.docx"]`, and a host-side plugin resolves that reference to bytes before the tool is called. Morphyard is written to survive the injection behaviour observed in such hosts, which is not intuitive:
 
 1. **Matching is by parameter value, not parameter name.** The host scans every string parameter for an upload reference. When it finds one it writes the base64 into `file_content` (overwriting any existing value), fills `file_name` with the original name only if `file_name` is not already set, and blanks the parameter that held the reference (unless that parameter was `file_content` itself).
 2. **`mime_type` is never injected on the MCP path.** Format detection therefore depends on `file_name` in practice, which is why `detect_format()` tries the extension before the MIME type. The parameter is kept for REST callers.
@@ -171,15 +173,15 @@ Plans computed with `allow_quality_loss=false` (`prefer_fidelity=True`):
 | `xlsx → docx` | `xlsx →(soffice)→ html →(pandoc)→ docx` | |
 | `csv → pdf` | `csv →(soffice)→ xlsx →(soffice)→ pdf` | |
 | `doc → md` | `doc →(soffice)→ docx →(pandoc)→ md` | |
-| `pdf → md` | `pdf →(anydoc)→ md` | Direct path; floor does not apply |
+| `pdf → md` | `pdf →(firecrawl)→ md` | Direct path; floor does not apply |
 | `pdf → docx` | Rejected | Only path passes through content extraction; layout would be lost. Allowed with a warning when `allow_quality_loss=true` (the default) |
 | `png → xlsx` | Rejected | No combination of engines reaches the target |
 
 ## Authentication
 
-AnyDoc is an OAuth 2.1 resource server. It issues no tokens and stores no users. `src/auth/` configures FastMCP's `JWTVerifier` with `jwks_uri = <MCP_GATE_URL>/.well-known/jwks.json`, the expected issuer and audience, and optional `required_scopes`; RS256 bearer tokens issued by [MCP Gate](https://github.com/xianhong1208/MCP_Gate) are verified offline against that JWKS. The server publishes `/.well-known/oauth-protected-resource/mcp` so OAuth-aware MCP clients can discover the authorisation server.
+Morphyard is an OAuth 2.1 resource server. It issues no tokens and stores no users. `src/auth/` configures FastMCP's `JWTVerifier` with `jwks_uri = <MCP_GATE_URL>/.well-known/jwks.json`, the expected issuer and audience, and optional `required_scopes`; RS256 bearer tokens issued by [MCP Gate](https://github.com/xianhong1208/MCP_Gate) are verified offline against that JWKS. The server publishes `/.well-known/oauth-protected-resource/mcp` so OAuth-aware MCP clients can discover the authorisation server.
 
-Offline verification alone cannot see revocations, so `auth.revocation` (off by default) adds MCP Gate's revocation feed: `src/auth/revocation.py` runs a poller for the app's lifetime (started and stopped in `create_app`'s lifespan) that mirrors `POST <issuer>/oauth/revoked` into an in-memory `jti -> exp` map — a full fetch first and hourly, incremental `since` polls in between, jitter and exponential backoff on errors — and `src/auth/fastmcp_verifier.py` (a `JWTVerifier` subclass) rejects listed `jti`s with the usual 401 `invalid_token`. `fail_mode: open` keeps accepting tokens while the feed is unreachable; `closed` rejects all of them once the list is stale. The feed needs a confidential client bound to AnyDoc in MCP Gate (README → *Token revocation*); its state is reported by `GET /health`.
+Offline verification alone cannot see revocations, so `auth.revocation` (off by default) adds MCP Gate's revocation feed: `src/auth/revocation.py` runs a poller for the app's lifetime (started and stopped in `create_app`'s lifespan) that mirrors `POST <issuer>/oauth/revoked` into an in-memory `jti -> exp` map — a full fetch first and hourly, incremental `since` polls in between, jitter and exponential backoff on errors — and `src/auth/fastmcp_verifier.py` (a `JWTVerifier` subclass) rejects listed `jti`s with the usual 401 `invalid_token`. `fail_mode: open` keeps accepting tokens while the feed is unreachable; `closed` rejects all of them once the list is stale. The feed needs a confidential client bound to Morphyard in MCP Gate ([configuration.md → *Token revocation*](configuration.md#token-revocation)); its state is reported by `GET /health`.
 
 ## Testing
 
@@ -189,8 +191,8 @@ Three layers with deliberately separate responsibilities:
 uv run pytest                              # logic, < 1 s
 uv run python scripts/sweep_routes.py      # engines, ~70 s
 
-# Protocol check: start the server in another terminal first (config.test.yaml has auth disabled)
-SERVER_PORT=5056 uv run python main.py --config config/config.test.yaml
+# Protocol check: start the server in another terminal first, with authentication off
+AUTH_ENABLED=false SERVER_PORT=5056 MORPHYARD_REVOCATION_ENABLED=false uv run python main.py
 uv run python scripts/mcp_smoke.py
 ```
 
@@ -213,13 +215,13 @@ Measured with Pandoc, LibreOffice (writer / calc / impress), Tesseract (chi_tra 
 |---|---|
 | Unit tests | All passing |
 | Full route sweep | 162 / 162 |
-| anydoc input formats | 13 / 13 (pdf, docx, doc, odt, rtf, epub, xlsx, xls, ods, pptx, ppt, odp, csv) |
+| firecrawl input formats | 13 / 13 (pdf, docx, doc, odt, rtf, epub, xlsx, xls, ods, pptx, ppt, odp, csv) |
 | OCR routes (image → text) | 12 / 12; Chinese and English correct |
 | Scanned-PDF automatic fallback | Pass |
 
 Known quality gaps (conversion succeeds; result is imperfect):
 
-- **Tables in `.ppt` (1997–2003 binary) are flattened to plain text**, not Markdown tables. The other twelve anydoc input formats preserve table structure; `.pptx` is unaffected.
+- **Tables in `.ppt` (1997–2003 binary) are flattened to plain text**, not Markdown tables. The other twelve firecrawl input formats preserve table structure; `.pptx` is unaffected.
 - **Table recovery from PDF is heuristic** and depends on how the source drew the table. A PDF produced from DOCX usually recovers as a table; a complex layout may not.
 
 ## Known limits
@@ -251,9 +253,9 @@ Extracted images are appended at the end of the Markdown; for PDF sources the pa
 | Source | Pipeline | Position information |
 |---|---|---|
 | PDF | pypdf extracts XObjects, de-duplicated by content hash | Does not exist: PDF has drawing coordinates, not reading order |
-| docx / pptx / odt / epub | Assets from anydoc's `to_document()` | Exists but unused (see below) |
+| docx / pptx / odt / epub | Assets from firecrawl's `to_document()` | Exists but unused (see below) |
 
-Non-PDF sources do know where an image belongs: in anydoc's document model an image is an inline element of `kind="image"` between the correct paragraphs, with `source.asset_id` pointing at `doc.assets[id]`. This is not used because `to_markdown()` drops images (keeping only alt text), and inserting them precisely would require reimplementing the whole Markdown serialiser (headings, tables, lists, footnotes, styles). Rewriting something that already works well for one feature is not worthwhile. If it is done later, the entry point is `Document.blocks`, not `to_markdown()`.
+Non-PDF sources do know where an image belongs: in firecrawl's document model an image is an inline element of `kind="image"` between the correct paragraphs, with `source.asset_id` pointing at `doc.assets[id]`. This is not used because `to_markdown()` drops images (keeping only alt text), and inserting them precisely would require reimplementing the whole Markdown serialiser (headings, tables, lists, footnotes, styles). Rewriting something that already works well for one feature is not worthwhile. If it is done later, the entry point is `Document.blocks`, not `to_markdown()`.
 
 Images under 2 KB (`MIN_IMAGE_BYTES`) are treated as decorative (rules, icons, textures) and skipped; extraction stops at 40 images (`MAX_IMAGES`) or 15 MB in total (`MAX_TOTAL_IMAGE_BYTES`).
 
@@ -267,4 +269,4 @@ Hosts that inject uploaded files skip non-string parameters, so a `list[str]` of
 
 ### `.xlsb` is not supported
 
-anydoc's extension table maps `.xlsb` to its xlsx handler, but XLSB stores BIFF12 binary (`xl/workbook.bin`) rather than XML, and a synthesised BIFF12 container is rejected with `MalformedError`. `_EXT_ALIASES` therefore deliberately excludes it. LibreOffice cannot export XLSB, so the behaviour could not be confirmed with a real file; before adding support, verify with an `.xlsb` produced by Excel rather than trusting the extension mapping. By contrast `.docm`, `.xlsm`, `.pptm` and `.ppsx` have been verified and are in the alias table.
+firecrawl's extension table maps `.xlsb` to its xlsx handler, but XLSB stores BIFF12 binary (`xl/workbook.bin`) rather than XML, and a synthesised BIFF12 container is rejected with `MalformedError`. `_EXT_ALIASES` therefore deliberately excludes it. LibreOffice cannot export XLSB, so the behaviour could not be confirmed with a real file; before adding support, verify with an `.xlsb` produced by Excel rather than trusting the extension mapping. By contrast `.docm`, `.xlsm`, `.pptm` and `.ppsx` have been verified and are in the alias table.
